@@ -365,7 +365,6 @@ button { font-family: inherit; cursor: pointer; }
   margin-bottom: 8px;
 }
 
-.app-card__id { font-size: 12px; color: var(--ink-faint); margin-bottom: 2px; }
 .app-card__title { font-weight: 600; font-size: 15px; }
 .app-card__company { color: var(--ink-soft); font-size: 13.5px; margin-top: 2px; }
 
@@ -458,12 +457,6 @@ button { font-family: inherit; cursor: pointer; }
   grid-template-columns: 1fr 1fr;
   gap: 12px;
 }
-
-.salary-input-group { display: flex; gap: 6px; }
-
-.salary-currency-select { width: 64px; flex-shrink: 0; }
-
-.other-detail-field { margin-top: 8px; }
 
 .skills-grid {
   display: grid;
