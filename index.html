@@ -102,6 +102,7 @@
         <table class="ledger">
           <thead>
             <tr>
+              <th>Application ID</th>
               <th>Job title</th>
               <th>Company</th>
               <th>Source</th>
@@ -140,6 +141,11 @@
           <h3 class="form-section__title">Basics</h3>
 
           <div class="field">
+            <label for="appNumberDisplay">Application ID</label>
+            <input type="text" id="appNumberDisplay" readonly disabled placeholder="Auto-generated after saving">
+          </div>
+
+          <div class="field">
             <label for="jobTitle">Job title <span class="required">*</span></label>
             <input type="text" id="jobTitle" name="jobTitle">
             <p class="field__error" id="err-jobTitle"></p>
@@ -168,6 +174,11 @@
                 <option>Other</option>
               </select>
               <p class="field__error" id="err-source"></p>
+              <div class="field other-detail-field" id="sourceOtherWrap" hidden>
+                <label for="sourceOther">Specify the source</label>
+                <input type="text" id="sourceOther" placeholder="e.g. Friend referral">
+                <p class="field__error" id="err-sourceOther"></p>
+              </div>
             </div>
 
             <div class="field">
@@ -186,7 +197,8 @@
               <option>Initial Interview</option>
               <option>Technical Interview</option>
               <option>Final Interview</option>
-              <option>Offer</option>
+              <option>Offered</option>
+              <option>Ghosted</option>
               <option>Rejected</option>
               <option>Withdrawn</option>
             </select>
@@ -247,6 +259,11 @@
                 <option>SG</option>
                 <option>Other</option>
               </select>
+              <div class="field other-detail-field" id="clientBasedOtherWrap" hidden>
+                <label for="clientBasedOther">Specify the client location</label>
+                <input type="text" id="clientBasedOther" placeholder="e.g. Japan">
+                <p class="field__error" id="err-clientBasedOther"></p>
+              </div>
             </div>
 
             <div class="field">
@@ -266,19 +283,36 @@
               <option value="">Not specified</option>
               <option>Full-time</option>
               <option>Part-time</option>
-              <option>Contract</option>
-              <option>Other</option>
+              <option>Freelance</option>
+              <option>Project-based</option>
             </select>
+            <div class="field other-detail-field" id="employmentTypeMonthsWrap" hidden>
+              <label for="employmentTypeMonths">Number of months</label>
+              <input type="number" id="employmentTypeMonths" placeholder="e.g. 6" min="1">
+              <p class="field__error" id="err-employmentTypeMonths"></p>
+            </div>
           </div>
 
           <div class="field-row">
             <div class="field">
               <label for="salaryOffer">Salary offer</label>
-              <input type="text" id="salaryOffer" placeholder="e.g. ₱60,000/mo">
+              <div class="salary-input-group">
+                <select id="salaryOfferCurrency" class="salary-currency-select">
+                  <option value="₱" selected>₱</option>
+                  <option value="$">$</option>
+                </select>
+                <input type="text" id="salaryOffer" placeholder="e.g. 60,000/mo">
+              </div>
             </div>
             <div class="field">
               <label for="salaryAsked">Salary asked</label>
-              <input type="text" id="salaryAsked" placeholder="e.g. ₱65,000/mo">
+              <div class="salary-input-group">
+                <select id="salaryAskedCurrency" class="salary-currency-select">
+                  <option value="₱" selected>₱</option>
+                  <option value="$">$</option>
+                </select>
+                <input type="text" id="salaryAsked" placeholder="e.g. 65,000/mo">
+              </div>
             </div>
           </div>
 

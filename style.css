@@ -365,6 +365,7 @@ button { font-family: inherit; cursor: pointer; }
   margin-bottom: 8px;
 }
 
+.app-card__id { font-size: 12px; color: var(--ink-faint); margin-bottom: 2px; }
 .app-card__title { font-weight: 600; font-size: 15px; }
 .app-card__company { color: var(--ink-soft); font-size: 13.5px; margin-top: 2px; }
 
@@ -457,6 +458,18 @@ button { font-family: inherit; cursor: pointer; }
   grid-template-columns: 1fr 1fr;
   gap: 12px;
 }
+
+.salary-input-group { display: flex; gap: 6px; }
+
+.salary-currency-select { width: 64px; flex-shrink: 0; }
+
+.other-detail-field { margin-top: 8px; }
+
+/* Without this, .field's own `display: flex` beats the browser's built-in
+   [hidden] rule, so the Source/Client based/Employment type conditional
+   fields stay visible even when JS sets their `hidden` attribute to true —
+   same root cause as the .overlay[hidden] and .card-list[hidden] fixes above. */
+.other-detail-field[hidden] { display: none; }
 
 .skills-grid {
   display: grid;
