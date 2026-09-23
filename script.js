@@ -15,6 +15,9 @@
 // The key we use to store everything in the browser's localStorage.
 const STORAGE_KEY = "jobtrackai_applications";
 
+// Current app version, included in JSON exports to prepare for a future import feature.
+const APP_VERSION = "0.2.0";
+
 // The full list of statuses, in the order they should progress.
 const STATUSES = [
   "To Apply",
@@ -22,7 +25,8 @@ const STATUSES = [
   "Initial Interview",
   "Technical Interview",
   "Final Interview",
-  "Offer",
+  "Offered",
+  "Ghosted",
   "Rejected",
   "Withdrawn",
 ];
@@ -35,7 +39,7 @@ const SOURCES = [
 // Shown as checkboxes for both "Required skills" and "Nice to have skills".
 const SKILLS = [
   "Postman", "API testing", "SQL", "JIRA", "Testrail", "Zephyr",
-  "Automation", "Playwright", "Javascript", "Selenium", "Cypress",
+  "Automation", "Playwright", "JavaScript", "Selenium", "Cypress",
   "Agile", "Scrum", "CI/CD pipeline", "Jenkins", "Azure DevOps",
   "Git/GitHub", "Jmeter", "LoadRunner", "ISTQB", "UAT", "UI testing",
   "Mobile testing", "SDLC/STLC", "Linux", "Python", "Docker",
@@ -49,7 +53,9 @@ const STATUS_META = {
   "Initial Interview":   { pill: "interview", bucket: "interview" },
   "Technical Interview": { pill: "interview", bucket: "interview" },
   "Final Interview":     { pill: "interview", bucket: "interview" },
-  "Offer":                { pill: "offer",     bucket: "offer" },
+  "Offered":              { pill: "offer",     bucket: "offer" },
+  "Offer":                { pill: "offer",     bucket: "offer" }, // legacy value, kept so applications saved before the "Offered" rename still display and count correctly
+  "Ghosted":              { pill: "withdrawn", bucket: "ghosted" },
   "Rejected":             { pill: "rejected",  bucket: "rejected" },
   "Withdrawn":            { pill: "withdrawn", bucket: "withdrawn" },
 };
@@ -89,8 +95,72 @@ function saveApplications(applications) {
   }
 }
 
+// Key used to persist the running counter behind auto-generated Application IDs.
+const APP_NUMBER_KEY = "jobtrackai_next_app_number";
+
+/** Reads the next Application ID number to use, without consuming it. */
+function peekNextAppNumber() {
+  const raw = localStorage.getItem(APP_NUMBER_KEY);
+  const n = parseInt(raw, 10);
+  if (Number.isInteger(n) && n > 0) return n;
+  // Counter missing or corrupted — fall back to one past the highest
+  // Application ID actually present in the data, so we never hand out
+  // a number that collides with an existing record.
+  return getHighestAppNumber() + 1;
+}
+
+/** Finds the highest numeric suffix among existing "APP-000N" IDs currently saved. */
+function getHighestAppNumber() {
+  let highest = 0;
+  applications.forEach((app) => {
+    const match = /^APP-(\d+)$/.exec(app.appNumber || "");
+    if (match) {
+      const n = parseInt(match[1], 10);
+      if (n > highest) highest = n;
+    }
+  });
+  return highest;
+}
+
+/** Formats a number as "APP-0001". */
+function formatAppNumber(n) {
+  return "APP-" + String(n).padStart(4, "0");
+}
+
+/**
+ * Records that the given Application ID number has now been used, so the
+ * next application gets the next number — even after this one is later
+ * deleted. Only call this after a create has actually been saved
+ * successfully; a failed save should never consume a number.
+ */
+function commitAppNumber(n) {
+  try {
+    localStorage.setItem(APP_NUMBER_KEY, String(n + 1));
+  } catch (err) {
+    console.error("Could not persist the next Application ID counter:", err);
+  }
+}
+
+/**
+ * One-time data migration: any application still saved with the old
+ * "Offer" status (from before it was renamed to "Offered") gets updated
+ * in localStorage itself, not just displayed correctly at runtime.
+ */
+function migrateLegacyOfferStatus(apps) {
+  let didMigrate = false;
+  const migrated = apps.map((app) => {
+    if (app.status === "Offer") {
+      didMigrate = true;
+      return { ...app, status: "Offered" };
+    }
+    return app;
+  });
+  if (didMigrate) saveApplications(migrated);
+  return migrated;
+}
+
 // In-memory copy of the applications, kept in sync with localStorage.
-let applications = loadApplications();
+let applications = migrateLegacyOfferStatus(loadApplications());
 
 /* ---------------------------------------------------------
    2. DOM REFERENCES
@@ -216,7 +286,7 @@ function renderAll() {
 }
 
 function renderSummary() {
-  const counts = { toapply: 0, applied: 0, interview: 0, offer: 0, rejected: 0, withdrawn: 0 };
+  const counts = { toapply: 0, applied: 0, interview: 0, offer: 0, rejected: 0, withdrawn: 0, ghosted: 0 };
 
   applications.forEach((app) => {
     const meta = STATUS_META[app.status];
@@ -288,6 +358,7 @@ function renderTableRows(list) {
   list.forEach((app) => {
     const tr = document.createElement("tr");
     tr.innerHTML = `
+      <td class="cell-muted">${escapeHtml(app.appNumber || "—")}</td>
       <td class="cell-title">${escapeHtml(app.jobTitle)}</td>
       <td>${escapeHtml(app.company)}</td>
       <td class="cell-muted">${escapeHtml(app.source)}</td>
@@ -313,6 +384,7 @@ function renderCardItems(list) {
     card.innerHTML = `
       <div class="app-card__top">
         <div>
+          <div class="app-card__id">${escapeHtml(app.appNumber || "—")}</div>
           <div class="app-card__title">${escapeHtml(app.jobTitle)}</div>
           <div class="app-card__company">${escapeHtml(app.company)}</div>
         </div>
@@ -352,11 +424,12 @@ function statusPillHtml(status) {
    --------------------------------------------------------- */
 
 const formFieldIds = [
-  "jobTitle", "company", "source", "dateApplied", "status",
+  "jobTitle", "company", "source", "sourceOther", "dateApplied", "status",
   "jobUrl", "companyBackground", "jobDescription",
   "requiredSkillsOther", "niceToHaveSkillsOther", "companyBenefits",
-  "clientBased", "workArrangement",
-  "employmentType", "salaryOffer", "salaryAsked", "notes",
+  "clientBased", "clientBasedOther", "workArrangement",
+  "employmentType", "employmentTypeMonths", "salaryOfferCurrency", "salaryOffer",
+  "salaryAskedCurrency", "salaryAsked", "notes",
 ];
 
 function openForm(editId) {
@@ -370,19 +443,41 @@ function openForm(editId) {
     if (!app) return;
     els.formPanelTitle.textContent = "Edit application";
     document.getElementById("appId").value = app.id;
+    document.getElementById("appNumberDisplay").value = app.appNumber || "—";
     formFieldIds.forEach((field) => {
       const el = document.getElementById(field);
       if (el) el.value = app[field] || "";
     });
+    // Older records saved before the currency dropdown existed won't have
+    // a currency value — default those to Peso rather than leaving the
+    // select with nothing chosen.
+    document.getElementById("salaryOfferCurrency").value = app.salaryOfferCurrency || "₱";
+    document.getElementById("salaryAskedCurrency").value = app.salaryAskedCurrency || "₱";
     setCheckedSkills(document.getElementById("requiredSkillsGrid"), app.requiredSkills);
     setCheckedSkills(document.getElementById("niceToHaveSkillsGrid"), app.niceToHaveSkills);
   } else {
     els.formPanelTitle.textContent = "Add application";
     document.getElementById("appId").value = "";
+    document.getElementById("appNumberDisplay").value = "";
   }
+
+  syncOtherField(document.getElementById("source"), document.getElementById("sourceOtherWrap"));
+  syncOtherField(document.getElementById("clientBased"), document.getElementById("clientBasedOtherWrap"));
+  syncEmploymentTypeMonthsField();
 
   els.formOverlay.hidden = false;
   document.getElementById("jobTitle").focus();
+}
+
+/** Shows/hides an "Other — please specify" field group based on its select's current value. */
+function syncOtherField(selectEl, wrapperEl) {
+  wrapperEl.hidden = selectEl.value !== "Other";
+}
+
+/** Shows/hides the "number of months" field group based on whether Employment type is Project-based. */
+function syncEmploymentTypeMonthsField() {
+  document.getElementById("employmentTypeMonthsWrap").hidden =
+    document.getElementById("employmentType").value !== "Project-based";
 }
 
 function closeForm() {
@@ -394,23 +489,63 @@ function clearAllFieldErrors() {
   document.querySelectorAll(".has-error").forEach((el) => el.classList.remove("has-error"));
 }
 
+// Per-field validity rules, shared by full-form validation (validateForm)
+// and by live error-clearing as the user types/selects (clearFieldErrorIfNowValid).
+// Each rule receives the full form data object so a conditional field
+// (e.g. sourceOther) can check its parent select's current value.
+// Key order matches the form's visual top-to-bottom layout, so "first
+// invalid field" focus always lands on whichever error appears first on screen.
+const FIELD_RULES = {
+  jobTitle: {
+    isValid: (data) => data.jobTitle.trim().length > 0,
+    message: "Job title is required.",
+  },
+  company: {
+    isValid: (data) => data.company.trim().length > 0,
+    message: "Company name is required.",
+  },
+  source: {
+    isValid: (data) => !!data.source,
+    message: "Please select where you applied.",
+  },
+  sourceOther: {
+    isValid: (data) => data.source !== "Other" || !!(data.sourceOther || "").trim(),
+    message: "Please specify the source.",
+  },
+  dateApplied: {
+    isValid: (data) => !!data.dateApplied,
+    message: "Please select the date you applied.",
+  },
+  status: {
+    isValid: (data) => !!data.status,
+    message: "Please select a status.",
+  },
+  jobUrl: {
+    isValid: (data) => !data.jobUrl || isLikelyValidUrl(data.jobUrl),
+    message: "That doesn't look like a valid URL (include https://).",
+  },
+  clientBasedOther: {
+    isValid: (data) => data.clientBased !== "Other" || !!(data.clientBasedOther || "").trim(),
+    message: "Please specify the client location.",
+  },
+  employmentTypeMonths: {
+    isValid: (data) => data.employmentType !== "Project-based" || !!(data.employmentTypeMonths || "").trim(),
+    message: "Please enter the number of months.",
+  },
+};
+
 /**
- * Validates the required fields and a couple of format checks.
- * Returns an object of { fieldId: errorMessage } — empty object means valid.
+ * Validates the required fields (including conditionally-required ones)
+ * and a couple of format checks. Returns an object of
+ * { fieldId: errorMessage } — empty object means valid.
  */
 function validateForm(data) {
   const errors = {};
-
-  if (!data.jobTitle.trim()) errors.jobTitle = "Job title is required.";
-  if (!data.company.trim()) errors.company = "Company name is required.";
-  if (!data.source) errors.source = "Please select where you applied.";
-  if (!data.dateApplied) errors.dateApplied = "Please select the date you applied.";
-  if (!data.status) errors.status = "Please select a status.";
-
-  if (data.jobUrl && !isLikelyValidUrl(data.jobUrl)) {
-    errors.jobUrl = "That doesn't look like a valid URL (include https://).";
-  }
-
+  Object.keys(FIELD_RULES).forEach((field) => {
+    if (!FIELD_RULES[field].isValid(data)) {
+      errors[field] = FIELD_RULES[field].message;
+    }
+  });
   return errors;
 }
 
@@ -433,6 +568,27 @@ function showFieldErrors(errors) {
   });
 }
 
+/** Reads the current live value of every form field, keyed by field id. */
+function getCurrentFieldValues() {
+  const data = {};
+  formFieldIds.forEach((field) => {
+    const el = document.getElementById(field);
+    if (el) data[field] = el.value;
+  });
+  return data;
+}
+
+/** Clears a single field's inline error the moment it becomes valid, without waiting for another Save click. */
+function clearFieldErrorIfNowValid(field) {
+  const el = document.getElementById(field);
+  if (!el || !el.classList.contains("has-error")) return;
+  const rule = FIELD_RULES[field];
+  if (rule && !rule.isValid(getCurrentFieldValues())) return;
+  el.classList.remove("has-error");
+  const errorEl = document.getElementById("err-" + field);
+  if (errorEl) errorEl.textContent = "";
+}
+
 function handleFormSubmit(event) {
   event.preventDefault();
 
@@ -442,6 +598,13 @@ function handleFormSubmit(event) {
   });
   data.requiredSkills = getCheckedSkills(document.getElementById("requiredSkillsGrid"));
   data.niceToHaveSkills = getCheckedSkills(document.getElementById("niceToHaveSkillsGrid"));
+
+  // A conditional field only makes sense while its parent select is still
+  // on the triggering value — if the user changed their mind, blank it out
+  // rather than silently saving stale, hidden data.
+  if (data.source !== "Other") data.sourceOther = "";
+  if (data.clientBased !== "Other") data.clientBasedOther = "";
+  if (data.employmentType !== "Project-based") data.employmentTypeMonths = "";
 
   const errors = validateForm(data);
   if (Object.keys(errors).length > 0) {
@@ -458,6 +621,11 @@ function handleFormSubmit(event) {
   const existingId = document.getElementById("appId").value;
   const now = new Date().toISOString();
 
+  // For a brand-new application, reserve the next Application ID number now,
+  // but don't persist the counter yet — that only happens after a
+  // confirmed successful save, so a failed save never burns a number.
+  const newAppNumber = existingId ? null : peekNextAppNumber();
+
   // Build the updated list first, without touching the real `applications`
   // array yet — that way, if saving fails, the in-memory list and
   // localStorage never fall out of sync with each other or with what
@@ -470,7 +638,7 @@ function handleFormSubmit(event) {
   } else {
     updatedApplications = [
       ...applications,
-      { id: generateId(), ...data, createdAt: now, updatedAt: now },
+      { id: generateId(), appNumber: formatAppNumber(newAppNumber), ...data, createdAt: now, updatedAt: now },
     ];
   }
 
@@ -480,6 +648,8 @@ function handleFormSubmit(event) {
     els.formMsg.classList.add("form-msg--error");
     return;
   }
+
+  if (newAppNumber !== null) commitAppNumber(newAppNumber);
 
   applications = updatedApplications;
   renderAll();
@@ -503,16 +673,17 @@ function openDetails(id) {
 
   els.detailsBody.innerHTML = `
     <div class="detail-grid">
+      ${detailField("Application ID", app.appNumber || "—")}
       ${detailField("Job title", app.jobTitle)}
       ${detailField("Company", app.company)}
-      ${detailField("Source", app.source)}
+      ${detailField("Source", formatSourceDisplay(app.source, app.sourceOther))}
       ${detailField("Date applied", formatDate(app.dateApplied))}
       ${detailField("Status", statusPillHtml(app.status), true)}
-      ${detailField("Client based", app.clientBased)}
+      ${detailField("Client based", formatClientBasedDisplay(app.clientBased, app.clientBasedOther))}
       ${detailField("Work arrangement", app.workArrangement)}
-      ${detailField("Employment type", app.employmentType)}
-      ${detailField("Salary offer", app.salaryOffer)}
-      ${detailField("Salary asked", app.salaryAsked)}
+      ${detailField("Employment type", formatEmploymentTypeDisplay(app.employmentType, app.employmentTypeMonths))}
+      ${detailField("Salary offer", formatSalaryDisplay(app.salaryOfferCurrency, app.salaryOffer))}
+      ${detailField("Salary asked", formatSalaryDisplay(app.salaryAskedCurrency, app.salaryAsked))}
     </div>
     ${detailBlock("Job posting URL", app.jobUrl ? linkHtml(app.jobUrl) : "", true)}
     ${detailBlock("Company background", app.companyBackground)}
@@ -555,6 +726,36 @@ function combineSkillsText(skillsArray, otherText) {
   const parts = Array.isArray(skillsArray) ? [...skillsArray] : [];
   if (otherText && otherText.trim()) parts.push(otherText.trim());
   return parts.join(", ");
+}
+
+/** Combines a currency symbol with a salary amount for display, e.g. "₱ 60,000/mo". */
+function formatSalaryDisplay(currency, amount) {
+  if (!amount) return "";
+  return `${currency || "₱"} ${amount}`;
+}
+
+/** Shows the entered detail when Client based is "Other", e.g. "Other: Japan". */
+function formatClientBasedDisplay(clientBased, otherText) {
+  if (clientBased === "Other" && otherText && otherText.trim()) {
+    return `Other: ${otherText.trim()}`;
+  }
+  return clientBased;
+}
+
+/** Shows the entered detail when Source is "Other", e.g. "Other: Friend referral". */
+function formatSourceDisplay(source, otherText) {
+  if (source === "Other" && otherText && otherText.trim()) {
+    return `Other: ${otherText.trim()}`;
+  }
+  return source;
+}
+
+/** Shows the entered month count when Employment type is "Project-based", e.g. "Project-based: 6 months". */
+function formatEmploymentTypeDisplay(employmentType, months) {
+  if (employmentType === "Project-based" && months && String(months).trim()) {
+    return `Project-based: ${String(months).trim()} months`;
+  }
+  return employmentType;
 }
 
 function linkHtml(url) {
@@ -606,7 +807,8 @@ function exportToJson() {
     return;
   }
 
-  const blob = new Blob([JSON.stringify(applications, null, 2)], { type: "application/json" });
+  const exportPayload = { version: APP_VERSION, applications };
+  const blob = new Blob([JSON.stringify(exportPayload, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   const dateStamp = new Date().toISOString().slice(0, 10);
@@ -669,6 +871,26 @@ function attachEventListeners() {
   els.closeFormBtn.addEventListener("click", closeForm);
   els.cancelFormBtn.addEventListener("click", closeForm);
   els.appForm.addEventListener("submit", handleFormSubmit);
+
+  Object.keys(FIELD_RULES).forEach((field) => {
+    const el = document.getElementById(field);
+    if (!el) return;
+    const eventName = el.tagName === "SELECT" || el.type === "date" ? "change" : "input";
+    el.addEventListener(eventName, () => clearFieldErrorIfNowValid(field));
+  });
+
+  document.getElementById("source").addEventListener("change", () => {
+    syncOtherField(document.getElementById("source"), document.getElementById("sourceOtherWrap"));
+    clearFieldErrorIfNowValid("sourceOther");
+  });
+  document.getElementById("clientBased").addEventListener("change", () => {
+    syncOtherField(document.getElementById("clientBased"), document.getElementById("clientBasedOtherWrap"));
+    clearFieldErrorIfNowValid("clientBasedOther");
+  });
+  document.getElementById("employmentType").addEventListener("change", () => {
+    syncEmploymentTypeMonthsField();
+    clearFieldErrorIfNowValid("employmentTypeMonths");
+  });
 
   // Details panel
   els.closeDetailsBtn.addEventListener("click", closeDetails);
