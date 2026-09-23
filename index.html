@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>JobTrack AI</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- ===== Header ===== -->
+  <header class="app-header">
+    <div class="app-header__brand">
+      <span class="app-header__mark">JT</span>
+      <div>
+        <h1 class="app-header__title">JobTrack AI</h1>
+        <p class="app-header__subtitle">Your job search, organized in one place</p>
+      </div>
+    </div>
+    <div class="app-header__actions">
+      <button type="button" class="btn btn--ghost" id="exportBtn">Export backup</button>
+      <button type="button" class="btn btn--primary" id="addBtn">+ Add application</button>
+    </div>
+  </header>
+
+  <main class="app-main">
+
+    <!-- ===== Summary cards ===== -->
+    <section class="summary" aria-label="Application summary">
+      <div class="summary-card" data-stat="total">
+        <span class="summary-card__label">Total</span>
+        <span class="summary-card__value" id="statTotal">0</span>
+      </div>
+      <div class="summary-card summary-card--applied" data-stat="applied">
+        <span class="summary-card__label">Applied</span>
+        <span class="summary-card__value" id="statApplied">0</span>
+      </div>
+      <div class="summary-card summary-card--interview" data-stat="interview">
+        <span class="summary-card__label">Interview</span>
+        <span class="summary-card__value" id="statInterview">0</span>
+      </div>
+      <div class="summary-card summary-card--offer" data-stat="offer">
+        <span class="summary-card__label">Offer</span>
+        <span class="summary-card__value" id="statOffer">0</span>
+      </div>
+      <div class="summary-card summary-card--rejected" data-stat="rejected">
+        <span class="summary-card__label">Rejected</span>
+        <span class="summary-card__value" id="statRejected">0</span>
+      </div>
+    </section>
+
+    <!-- ===== Toolbar: search / filter / sort ===== -->
+    <section class="toolbar" aria-label="Search and filters">
+      <div class="toolbar__field toolbar__field--search">
+        <label for="searchInput" class="sr-only">Search by job title or company</label>
+        <div class="search-input-wrap">
+          <input type="text" id="searchInput" placeholder="Search by job title or company…">
+          <button type="button" class="search-clear-btn" id="clearSearchBtn" aria-label="Clear search" hidden>✕</button>
+        </div>
+      </div>
+
+      <div class="toolbar__field">
+        <label for="filterStatus">Status</label>
+        <select id="filterStatus">
+          <option value="">All statuses</option>
+        </select>
+      </div>
+
+      <div class="toolbar__field">
+        <label for="filterSource">Source</label>
+        <select id="filterSource">
+          <option value="">All sources</option>
+        </select>
+      </div>
+
+      <div class="toolbar__field">
+        <label for="sortBy">Sort by</label>
+        <select id="sortBy">
+          <option value="date-desc">Date applied (newest)</option>
+          <option value="date-asc">Date applied (oldest)</option>
+        </select>
+      </div>
+
+      <button type="button" class="btn btn--text" id="resetFiltersBtn">Reset filters</button>
+    </section>
+
+    <!-- ===== Applications list ===== -->
+    <section class="list-section" aria-label="Applications list">
+
+      <!-- Empty state -->
+      <div class="empty-state" id="emptyState" hidden>
+        <p class="empty-state__title" id="emptyStateTitle">No applications yet</p>
+        <p class="empty-state__body" id="emptyStateBody">Add your first job application to start tracking your search.</p>
+        <button type="button" class="btn btn--primary" id="emptyStateBtn">+ Add application</button>
+      </div>
+
+      <!-- Table (desktop) -->
+      <div class="table-wrap" id="tableWrap">
+        <table class="ledger">
+          <thead>
+            <tr>
+              <th>Job title</th>
+              <th>Company</th>
+              <th>Source</th>
+              <th>Date applied</th>
+              <th>Status</th>
+              <th>Work arrangement</th>
+              <th class="ledger__actions-col">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="ledgerBody">
+            <!-- rows injected by script.js -->
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Cards (mobile) -->
+      <div class="card-list" id="cardList">
+        <!-- cards injected by script.js -->
+      </div>
+
+    </section>
+  </main>
+
+  <!-- ===== Add / Edit panel ===== -->
+  <div class="overlay" id="formOverlay" hidden>
+    <div class="panel" role="dialog" aria-modal="true" aria-labelledby="formPanelTitle">
+      <div class="panel__header">
+        <h2 id="formPanelTitle">Add application</h2>
+        <button type="button" class="icon-btn" id="closeFormBtn" aria-label="Close">✕</button>
+      </div>
+
+      <form id="appForm" class="panel__body" novalidate>
+        <input type="hidden" id="appId">
+
+        <div class="form-section">
+          <h3 class="form-section__title">Basics</h3>
+
+          <div class="field">
+            <label for="jobTitle">Job title <span class="required">*</span></label>
+            <input type="text" id="jobTitle" name="jobTitle">
+            <p class="field__error" id="err-jobTitle"></p>
+          </div>
+
+          <div class="field">
+            <label for="company">Company name <span class="required">*</span></label>
+            <input type="text" id="company" name="company">
+            <p class="field__error" id="err-company"></p>
+          </div>
+
+          <div class="field-row">
+            <div class="field">
+              <label for="source">Application source <span class="required">*</span></label>
+              <select id="source" name="source">
+                <option value="">Select a source</option>
+                <option>LinkedIn</option>
+                <option>Indeed</option>
+                <option>JobStreet</option>
+                <option>OnlineJobsPH</option>
+                <option>Kalibrr</option>
+                <option>Wellfound</option>
+                <option>FoundIt</option>
+                <option>Company Website</option>
+                <option>Referral</option>
+                <option>Other</option>
+              </select>
+              <p class="field__error" id="err-source"></p>
+            </div>
+
+            <div class="field">
+              <label for="dateApplied">Date applied <span class="required">*</span></label>
+              <input type="date" id="dateApplied" name="dateApplied">
+              <p class="field__error" id="err-dateApplied"></p>
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="status">Application status <span class="required">*</span></label>
+            <select id="status" name="status">
+              <option value="">Select a status</option>
+              <option>To Apply</option>
+              <option>Applied</option>
+              <option>Initial Interview</option>
+              <option>Technical Interview</option>
+              <option>Final Interview</option>
+              <option>Offer</option>
+              <option>Rejected</option>
+              <option>Withdrawn</option>
+            </select>
+            <p class="field__error" id="err-status"></p>
+          </div>
+        </div>
+
+        <div class="form-section">
+          <h3 class="form-section__title">Job details <span class="form-section__hint">optional</span></h3>
+
+          <div class="field">
+            <label for="jobUrl">Job posting URL</label>
+            <input type="url" id="jobUrl" placeholder="https://…">
+            <p class="field__error" id="err-jobUrl"></p>
+          </div>
+
+          <div class="field">
+            <label for="companyBackground">Company background</label>
+            <textarea id="companyBackground" rows="3"></textarea>
+          </div>
+
+          <div class="field">
+            <label for="jobDescription">Job description</label>
+            <textarea id="jobDescription" rows="4"></textarea>
+          </div>
+
+          <div class="field">
+            <label>Required skills</label>
+            <div class="skills-grid" id="requiredSkillsGrid"></div>
+            <div class="field skills-other">
+              <label for="requiredSkillsOther">Other</label>
+              <input type="text" id="requiredSkillsOther" placeholder="Add any skills not listed above, comma-separated">
+            </div>
+          </div>
+
+          <div class="field">
+            <label>Nice to have skills</label>
+            <div class="skills-grid" id="niceToHaveSkillsGrid"></div>
+            <div class="field skills-other">
+              <label for="niceToHaveSkillsOther">Other</label>
+              <input type="text" id="niceToHaveSkillsOther" placeholder="Add any skills not listed above, comma-separated">
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="companyBenefits">Company benefits</label>
+            <textarea id="companyBenefits" rows="3"></textarea>
+          </div>
+
+          <div class="field-row">
+            <div class="field">
+              <label for="clientBased">Client based</label>
+              <select id="clientBased">
+                <option value="">Not specified</option>
+                <option>PH</option>
+                <option>US</option>
+                <option>Australia</option>
+                <option>SG</option>
+                <option>Other</option>
+              </select>
+            </div>
+
+            <div class="field">
+              <label for="workArrangement">Work arrangement</label>
+              <select id="workArrangement">
+                <option value="">Not specified</option>
+                <option>Remote</option>
+                <option>Hybrid</option>
+                <option>On-site</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="employmentType">Employment type</label>
+            <select id="employmentType">
+              <option value="">Not specified</option>
+              <option>Full-time</option>
+              <option>Part-time</option>
+              <option>Contract</option>
+              <option>Other</option>
+            </select>
+          </div>
+
+          <div class="field-row">
+            <div class="field">
+              <label for="salaryOffer">Salary offer</label>
+              <input type="text" id="salaryOffer" placeholder="e.g. ₱60,000/mo">
+            </div>
+            <div class="field">
+              <label for="salaryAsked">Salary asked</label>
+              <input type="text" id="salaryAsked" placeholder="e.g. ₱65,000/mo">
+            </div>
+          </div>
+
+          <div class="field">
+            <label for="notes">Notes</label>
+            <textarea id="notes" rows="3"></textarea>
+          </div>
+        </div>
+
+        <p class="form-msg" id="formMsg" role="status"></p>
+      </form>
+
+      <div class="panel__footer">
+        <button type="button" class="btn btn--text" id="cancelFormBtn">Cancel</button>
+        <button type="submit" form="appForm" class="btn btn--primary">Save application</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== View details panel ===== -->
+  <div class="overlay" id="detailsOverlay" hidden>
+    <div class="panel" role="dialog" aria-modal="true" aria-labelledby="detailsPanelTitle">
+      <div class="panel__header">
+        <h2 id="detailsPanelTitle">Application details</h2>
+        <button type="button" class="icon-btn" id="closeDetailsBtn" aria-label="Close">✕</button>
+      </div>
+      <div class="panel__body" id="detailsBody">
+        <!-- injected by script.js -->
+      </div>
+      <div class="panel__footer">
+        <button type="button" class="btn btn--text" id="detailsEditBtn">Edit</button>
+        <button type="button" class="btn btn--primary" id="detailsCloseBtn">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Delete confirmation ===== -->
+  <div class="overlay overlay--center" id="deleteOverlay" hidden>
+    <div class="confirm-box" role="alertdialog" aria-modal="true" aria-labelledby="deleteTitle">
+      <h2 id="deleteTitle">Delete this application?</h2>
+      <p id="deleteMessage">This will permanently remove the application from this browser. This can't be undone.</p>
+      <div class="confirm-box__actions">
+        <button type="button" class="btn btn--text" id="cancelDeleteBtn">Cancel</button>
+        <button type="button" class="btn btn--danger" id="confirmDeleteBtn">Delete</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== Toast ===== -->
+  <div class="toast" id="toast" role="status" hidden></div>
+
+  <script src="script.js"></script>
+</body>
+</html>

@@ -1,0 +1,609 @@
+/* =========================================================
+   JobTrack AI — Design tokens
+   ========================================================= */
+:root {
+  --bg: #F6F7FA;
+  --surface: #FFFFFF;
+  --border: #E1E4EA;
+  --border-strong: #C7CCD6;
+
+  --ink: #1C2430;
+  --ink-soft: #5B6472;
+  --ink-faint: #8A94A6;
+
+  --primary: #35507A;
+  --primary-dark: #263C5C;
+  --primary-soft: #E9EEF5;
+
+  --accent: #D98E04;
+  --accent-soft: #FBF0D9;
+
+  --status-toapply-bg: #EEF0F3; --status-toapply-fg: #5B6472;
+  --status-applied-bg: #E4EDFA; --status-applied-fg: #2C5C9E;
+  --status-interview-bg: #FBF0D9; --status-interview-fg: #9C6604;
+  --status-offer-bg: #E4F3EA;   --status-offer-fg: #227048;
+  --status-rejected-bg: #FAE7E4; --status-rejected-fg: #A23A2E;
+  --status-withdrawn-bg: #EEF0F3; --status-withdrawn-fg: #7A8190;
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+
+  --font-head: 'Space Grotesk', 'Segoe UI', sans-serif;
+  --font-body: 'Inter', 'Segoe UI', sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+html { scroll-padding-top: env(safe-area-inset-top, 0px); }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3 { font-family: var(--font-head); margin: 0; }
+
+a { color: var(--primary); }
+
+.sr-only {
+  position: absolute; width: 1px; height: 1px;
+  overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap;
+}
+
+button { font-family: inherit; cursor: pointer; }
+
+/* Visible keyboard focus everywhere */
+:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 2px;
+}
+
+/* =========================================================
+   Header
+   ========================================================= */
+.app-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 20px clamp(16px, 4vw, 40px);
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
+.app-header__brand { display: flex; align-items: center; gap: 12px; }
+
+.app-header__mark {
+  display: grid; place-items: center;
+  width: 40px; height: 40px;
+  border-radius: var(--radius-sm);
+  background: var(--primary);
+  color: #fff;
+  font-family: var(--font-head);
+  font-weight: 700;
+  font-size: 14px;
+  flex-shrink: 0;
+}
+
+.app-header__title {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.app-header__subtitle {
+  margin: 2px 0 0;
+  color: var(--ink-soft);
+  font-size: 13px;
+}
+
+.app-header__actions { display: flex; gap: 10px; }
+
+/* =========================================================
+   Buttons
+   ========================================================= */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  padding: 10px 16px;
+  font-size: 14px;
+  font-weight: 600;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.btn--primary { background: var(--primary); color: #fff; }
+.btn--primary:hover { background: var(--primary-dark); }
+
+.btn--ghost { background: transparent; border-color: var(--border-strong); color: var(--ink); }
+.btn--ghost:hover { background: var(--primary-soft); border-color: var(--primary); }
+
+.btn--text { background: transparent; color: var(--ink-soft); padding: 10px 12px; }
+.btn--text:hover { color: var(--ink); text-decoration: underline; }
+
+.btn--danger { background: var(--status-rejected-fg); color: #fff; }
+.btn--danger:hover { background: #8A2E24; }
+
+.icon-btn {
+  background: transparent;
+  border: none;
+  color: var(--ink-soft);
+  font-size: 16px;
+  width: 32px; height: 32px;
+  border-radius: var(--radius-sm);
+}
+.icon-btn:hover { background: var(--bg); color: var(--ink); }
+
+/* =========================================================
+   Main layout
+   ========================================================= */
+.app-main {
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 28px clamp(16px, 4vw, 40px) 80px;
+}
+
+/* =========================================================
+   Summary cards
+   ========================================================= */
+.summary {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.summary-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--ink-faint);
+  border-radius: var(--radius-sm);
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.summary-card--applied   { border-left-color: var(--status-applied-fg); }
+.summary-card--interview { border-left-color: var(--status-interview-fg); }
+.summary-card--offer     { border-left-color: var(--status-offer-fg); }
+.summary-card--rejected  { border-left-color: var(--status-rejected-fg); }
+
+.summary-card__label {
+  font-size: 12.5px;
+  color: var(--ink-soft);
+}
+
+.summary-card__value {
+  font-family: var(--font-head);
+  font-size: 26px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+/* =========================================================
+   Toolbar
+   ========================================================= */
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 14px 16px;
+  margin-bottom: 20px;
+}
+
+.toolbar__field { display: flex; flex-direction: column; gap: 5px; }
+.toolbar__field label { font-size: 12.5px; color: var(--ink-soft); }
+.toolbar__field--search { flex: 1 1 220px; }
+
+.search-input-wrap { position: relative; display: flex; }
+
+.search-input-wrap input[type="text"] {
+  width: 100%;
+  padding-right: 30px;
+}
+
+.search-clear-btn {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--ink-faint);
+  font-size: 11px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.search-clear-btn:hover { background: var(--border); color: var(--ink-soft); }
+
+.toolbar input[type="text"],
+.toolbar select {
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  padding: 9px 10px;
+  font-size: 14px;
+  background: #fff;
+  color: var(--ink);
+  min-width: 140px;
+}
+
+.toolbar input[type="text"]:focus,
+.toolbar select:focus { border-color: var(--primary); }
+
+/* =========================================================
+   Empty state
+   ========================================================= */
+.empty-state {
+  text-align: center;
+  padding: 56px 20px;
+  background: var(--surface);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-md);
+}
+
+.empty-state__title {
+  font-family: var(--font-head);
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0 0 6px;
+}
+
+.empty-state__body {
+  color: var(--ink-soft);
+  margin: 0 0 18px;
+}
+
+/* =========================================================
+   Ledger table (desktop)
+   ========================================================= */
+.table-wrap {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow-x: auto;
+}
+
+.ledger {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 720px;
+}
+
+.ledger thead th {
+  text-align: left;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--ink-soft);
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.ledger tbody tr {
+  border-bottom: 1px solid var(--border);
+}
+.ledger tbody tr:last-child { border-bottom: none; }
+.ledger tbody tr:hover { background: var(--bg); }
+
+.ledger td {
+  padding: 12px 16px;
+  vertical-align: middle;
+  font-size: 14px;
+}
+
+.ledger td.cell-title { font-weight: 600; }
+.ledger td.cell-muted { color: var(--ink-soft); }
+
+.ledger__actions-col { text-align: right; }
+.ledger td.cell-actions { text-align: right; white-space: nowrap; }
+
+.row-action {
+  background: transparent;
+  border: none;
+  color: var(--ink-soft);
+  font-size: 13px;
+  font-weight: 600;
+  padding: 6px 8px;
+  border-radius: var(--radius-sm);
+}
+.row-action:hover { background: var(--primary-soft); color: var(--primary-dark); }
+.row-action--danger:hover { background: var(--status-rejected-bg); color: var(--status-rejected-fg); }
+
+/* =========================================================
+   Status pill
+   ========================================================= */
+.status-pill {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 999px;
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.status-pill--toapply    { background: var(--status-toapply-bg); color: var(--status-toapply-fg); }
+.status-pill--applied    { background: var(--status-applied-bg); color: var(--status-applied-fg); }
+.status-pill--interview  { background: var(--status-interview-bg); color: var(--status-interview-fg); }
+.status-pill--offer      { background: var(--status-offer-bg); color: var(--status-offer-fg); }
+.status-pill--rejected   { background: var(--status-rejected-bg); color: var(--status-rejected-fg); }
+.status-pill--withdrawn  { background: var(--status-withdrawn-bg); color: var(--status-withdrawn-fg); }
+
+/* =========================================================
+   Card list (mobile)
+   ========================================================= */
+.card-list { display: none; flex-direction: column; gap: 10px; }
+
+.app-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+}
+
+.app-card__top {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.app-card__title { font-weight: 600; font-size: 15px; }
+.app-card__company { color: var(--ink-soft); font-size: 13.5px; margin-top: 2px; }
+
+.app-card__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  font-size: 13px;
+  color: var(--ink-soft);
+  margin-bottom: 10px;
+}
+
+.app-card__actions { display: flex; gap: 6px; }
+
+/* =========================================================
+   Overlay / side panel
+   ========================================================= */
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(28, 36, 48, 0.45);
+  display: flex;
+  justify-content: flex-end;
+  z-index: 50;
+}
+
+.overlay--center { justify-content: center; align-items: center; }
+
+/* Without this, .overlay's own `display: flex` beats the browser's
+   built-in [hidden] rule, so all three overlays stay visible even
+   when JS sets their `hidden` attribute to true. */
+.overlay[hidden] { display: none; }
+
+.panel {
+  width: min(480px, 100%);
+  height: 100%;
+  background: var(--surface);
+  display: flex;
+  flex-direction: column;
+  box-shadow: -8px 0 24px rgba(28, 36, 48, 0.08);
+}
+
+.panel__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+.panel__header h2 { font-size: 17px; }
+
+.panel__body {
+  padding: 20px;
+  overflow-y: auto;
+  flex: 1 1 auto;
+}
+
+.panel__footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 16px 20px;
+  border-top: 1px solid var(--border);
+  flex-shrink: 0;
+}
+
+/* =========================================================
+   Form
+   ========================================================= */
+.form-section { margin-bottom: 22px; }
+
+.form-section__title {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: var(--ink-soft);
+  text-transform: none;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.form-section__hint { font-weight: 400; color: var(--ink-faint); }
+
+.field { display: flex; flex-direction: column; gap: 5px; margin-bottom: 14px; }
+
+.field-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.skills-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px;
+  background: var(--bg);
+}
+
+.skills-grid__item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13.5px;
+}
+
+.skills-grid__item input[type="checkbox"] {
+  width: 15px;
+  height: 15px;
+  accent-color: var(--primary);
+  flex-shrink: 0;
+}
+
+.skills-other { margin-top: 8px; }
+
+@media (max-width: 520px) {
+  .skills-grid { grid-template-columns: 1fr; }
+}
+
+.field label { font-size: 13px; font-weight: 500; color: var(--ink); }
+
+.required { color: var(--status-rejected-fg); }
+
+.field input,
+.field select,
+.field textarea {
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  padding: 9px 10px;
+  font-size: 14px;
+  font-family: inherit;
+  color: var(--ink);
+  background: #fff;
+}
+
+.field textarea { resize: vertical; }
+
+.field input:focus,
+.field select:focus,
+.field textarea:focus { border-color: var(--primary); }
+
+.field input.has-error,
+.field select.has-error,
+.field textarea.has-error { border-color: var(--status-rejected-fg); }
+
+.field__error {
+  font-size: 12.5px;
+  color: var(--status-rejected-fg);
+  margin: 0;
+  min-height: 15px;
+}
+
+.form-msg {
+  font-size: 13.5px;
+  color: var(--status-offer-fg);
+  min-height: 18px;
+}
+
+.form-msg--error { color: var(--status-rejected-fg); }
+
+/* =========================================================
+   Details panel
+   ========================================================= */
+.detail-group { margin-bottom: 18px; }
+
+.detail-group__label {
+  font-size: 12px;
+  color: var(--ink-soft);
+  margin-bottom: 3px;
+}
+
+.detail-group__value { font-size: 14.5px; }
+.detail-group__value--empty { color: var(--ink-faint); font-style: italic; }
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+/* =========================================================
+   Delete confirm box
+   ========================================================= */
+.confirm-box {
+  width: min(380px, 90vw);
+  background: var(--surface);
+  border-radius: var(--radius-md);
+  padding: 22px;
+}
+
+.confirm-box h2 { font-size: 16px; margin-bottom: 8px; }
+.confirm-box p { color: var(--ink-soft); font-size: 14px; margin: 0 0 18px; }
+.confirm-box__actions { display: flex; justify-content: flex-end; gap: 10px; }
+
+/* =========================================================
+   Toast
+   ========================================================= */
+.toast {
+  position: fixed;
+  top: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--ink);
+  color: #fff;
+  padding: 12px 20px;
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  font-weight: 500;
+  z-index: 100;
+}
+
+.toast--success {
+  background: var(--status-offer-bg);
+  color: var(--status-offer-fg);
+  border: 1px solid var(--status-offer-fg);
+}
+
+/* =========================================================
+   Responsive
+   ========================================================= */
+@media (max-width: 860px) {
+  .summary { grid-template-columns: repeat(2, 1fr); }
+}
+
+@media (max-width: 760px) {
+  .table-wrap { display: none; }
+  .card-list { display: flex; }
+  .card-list[hidden] { display: none; }
+}
+
+@media (max-width: 520px) {
+  .app-header__actions { width: 100%; }
+  .app-header__actions .btn { flex: 1; }
+  .field-row { grid-template-columns: 1fr; }
+  .detail-grid { grid-template-columns: 1fr; }
+  .summary { grid-template-columns: 1fr 1fr; }
+}

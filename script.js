@@ -1,0 +1,741 @@
+/* =========================================================
+   JobTrack AI — script.js
+   Everything the app does lives in this one file:
+   - reading/writing applications to localStorage
+   - rendering the dashboard, list, and panels
+   - handling the add/edit form and validation
+   - search, filter, sort
+   - export to JSON
+   ========================================================= */
+
+/* ---------------------------------------------------------
+   1. CONSTANTS & "DATABASE" (localStorage)
+   --------------------------------------------------------- */
+
+// The key we use to store everything in the browser's localStorage.
+const STORAGE_KEY = "jobtrackai_applications";
+
+// The full list of statuses, in the order they should progress.
+const STATUSES = [
+  "To Apply",
+  "Applied",
+  "Initial Interview",
+  "Technical Interview",
+  "Final Interview",
+  "Offer",
+  "Rejected",
+  "Withdrawn",
+];
+
+const SOURCES = [
+  "LinkedIn", "Indeed", "JobStreet", "OnlineJobsPH", "Kalibrr",
+  "Wellfound", "FoundIt", "Company Website", "Referral", "Other",
+];
+
+// Shown as checkboxes for both "Required skills" and "Nice to have skills".
+const SKILLS = [
+  "Postman", "API testing", "SQL", "JIRA", "Testrail", "Zephyr",
+  "Automation", "Playwright", "Javascript", "Selenium", "Cypress",
+  "Agile", "Scrum", "CI/CD pipeline", "Jenkins", "Azure DevOps",
+  "Git/GitHub", "Jmeter", "LoadRunner", "ISTQB", "UAT", "UI testing",
+  "Mobile testing", "SDLC/STLC", "Linux", "Python", "Docker",
+];
+
+// Maps a status to the CSS class used for its colored pill,
+// and to which summary-card bucket it counts toward.
+const STATUS_META = {
+  "To Apply":           { pill: "toapply",   bucket: "toapply" },
+  "Applied":             { pill: "applied",   bucket: "applied" },
+  "Initial Interview":   { pill: "interview", bucket: "interview" },
+  "Technical Interview": { pill: "interview", bucket: "interview" },
+  "Final Interview":     { pill: "interview", bucket: "interview" },
+  "Offer":                { pill: "offer",     bucket: "offer" },
+  "Rejected":             { pill: "rejected",  bucket: "rejected" },
+  "Withdrawn":            { pill: "withdrawn", bucket: "withdrawn" },
+};
+
+/**
+ * Reads all saved applications from localStorage.
+ * Returns an empty array if nothing has been saved yet,
+ * or if the saved data is somehow broken.
+ */
+function loadApplications() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch (err) {
+    console.error("Could not read saved applications:", err);
+    return [];
+  }
+}
+
+/**
+ * Saves the full list of applications to localStorage.
+ * This overwrites whatever was there before, so we always
+ * pass in the complete, up-to-date array.
+ * Returns true if the save succeeded, false if it didn't
+ * (e.g. storage is full or unavailable) so callers can avoid
+ * telling the user something was saved when it wasn't.
+ */
+function saveApplications(applications) {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(applications));
+    return true;
+  } catch (err) {
+    console.error("Could not save applications:", err);
+    return false;
+  }
+}
+
+// In-memory copy of the applications, kept in sync with localStorage.
+let applications = loadApplications();
+
+/* ---------------------------------------------------------
+   2. DOM REFERENCES
+   --------------------------------------------------------- */
+
+const els = {
+  // header
+  addBtn: document.getElementById("addBtn"),
+  exportBtn: document.getElementById("exportBtn"),
+
+  // summary
+  statTotal: document.getElementById("statTotal"),
+  statApplied: document.getElementById("statApplied"),
+  statInterview: document.getElementById("statInterview"),
+  statOffer: document.getElementById("statOffer"),
+  statRejected: document.getElementById("statRejected"),
+
+  // toolbar
+  searchInput: document.getElementById("searchInput"),
+  clearSearchBtn: document.getElementById("clearSearchBtn"),
+  filterStatus: document.getElementById("filterStatus"),
+  filterSource: document.getElementById("filterSource"),
+  sortBy: document.getElementById("sortBy"),
+  resetFiltersBtn: document.getElementById("resetFiltersBtn"),
+
+  // list
+  emptyState: document.getElementById("emptyState"),
+  emptyStateTitle: document.getElementById("emptyStateTitle"),
+  emptyStateBody: document.getElementById("emptyStateBody"),
+  emptyStateBtn: document.getElementById("emptyStateBtn"),
+  tableWrap: document.getElementById("tableWrap"),
+  ledgerBody: document.getElementById("ledgerBody"),
+  cardList: document.getElementById("cardList"),
+
+  // form panel
+  formOverlay: document.getElementById("formOverlay"),
+  formPanelTitle: document.getElementById("formPanelTitle"),
+  appForm: document.getElementById("appForm"),
+  closeFormBtn: document.getElementById("closeFormBtn"),
+  cancelFormBtn: document.getElementById("cancelFormBtn"),
+  formMsg: document.getElementById("formMsg"),
+
+  // details panel
+  detailsOverlay: document.getElementById("detailsOverlay"),
+  detailsBody: document.getElementById("detailsBody"),
+  detailsEditBtn: document.getElementById("detailsEditBtn"),
+  closeDetailsBtn: document.getElementById("closeDetailsBtn"),
+  detailsCloseBtn: document.getElementById("detailsCloseBtn"),
+
+  // delete confirm
+  deleteOverlay: document.getElementById("deleteOverlay"),
+  cancelDeleteBtn: document.getElementById("cancelDeleteBtn"),
+  confirmDeleteBtn: document.getElementById("confirmDeleteBtn"),
+
+  // toast
+  toast: document.getElementById("toast"),
+};
+
+// Tracks which application is currently open in the details panel
+// or queued for deletion, so the button handlers know what to act on.
+let currentDetailsId = null;
+let pendingDeleteId = null;
+
+/* ---------------------------------------------------------
+   3. INITIAL SETUP (runs once on page load)
+   --------------------------------------------------------- */
+
+function init() {
+  populateSelect(els.filterStatus, STATUSES, "All statuses");
+  populateSelect(els.filterSource, SOURCES, "All sources");
+  populateSkillsGrid(document.getElementById("requiredSkillsGrid"), "reqSkill");
+  populateSkillsGrid(document.getElementById("niceToHaveSkillsGrid"), "niceSkill");
+  renderAll();
+  attachEventListeners();
+}
+
+/** Fills a skills grid container with one checkbox per skill in SKILLS. */
+function populateSkillsGrid(gridEl, idPrefix) {
+  SKILLS.forEach((skill, index) => {
+    const id = `${idPrefix}-${index}`;
+    const wrapper = document.createElement("label");
+    wrapper.className = "skills-grid__item";
+    wrapper.setAttribute("for", id);
+    wrapper.innerHTML = `<input type="checkbox" id="${id}" value="${escapeHtml(skill)}"> ${escapeHtml(skill)}`;
+    gridEl.appendChild(wrapper);
+  });
+}
+
+/** Reads the checked skill checkboxes inside a grid container. */
+function getCheckedSkills(gridEl) {
+  return Array.from(gridEl.querySelectorAll("input[type=checkbox]:checked")).map((cb) => cb.value);
+}
+
+/** Checks the boxes in a grid container that match the given skill list. */
+function setCheckedSkills(gridEl, skills) {
+  const selected = new Set(skills || []);
+  gridEl.querySelectorAll("input[type=checkbox]").forEach((cb) => {
+    cb.checked = selected.has(cb.value);
+  });
+}
+
+/**
+ * Fills a <select> with <option> elements from a list of strings,
+ * keeping whatever "All ___" default option is already first.
+ */
+function populateSelect(selectEl, values, placeholderText) {
+  values.forEach((value) => {
+    const opt = document.createElement("option");
+    opt.value = value;
+    opt.textContent = value;
+    selectEl.appendChild(opt);
+  });
+}
+
+/* ---------------------------------------------------------
+   4. RENDERING
+   --------------------------------------------------------- */
+
+/** Re-renders the summary cards, the list, and the empty state. */
+function renderAll() {
+  renderSummary();
+  renderList();
+}
+
+function renderSummary() {
+  const counts = { toapply: 0, applied: 0, interview: 0, offer: 0, rejected: 0, withdrawn: 0 };
+
+  applications.forEach((app) => {
+    const meta = STATUS_META[app.status];
+    if (meta) counts[meta.bucket]++;
+  });
+
+  els.statTotal.textContent = applications.length;
+  els.statApplied.textContent = counts.applied;
+  els.statInterview.textContent = counts.interview;
+  els.statOffer.textContent = counts.offer;
+  els.statRejected.textContent = counts.rejected;
+}
+
+/** Applies search + filters + sort, then draws the table and card list. */
+function renderList() {
+  const visible = getFilteredAndSortedApplications();
+
+  const hasAnyApplications = applications.length > 0;
+  const hasVisibleApplications = visible.length > 0;
+
+  // Empty state: different message depending on *why* the list is empty.
+  els.emptyState.hidden = hasVisibleApplications;
+  if (!hasVisibleApplications) {
+    if (hasAnyApplications) {
+      els.emptyStateTitle.textContent = "No applications match your search";
+      els.emptyStateBody.textContent = "Try a different search term or reset your filters.";
+      els.emptyStateBtn.hidden = true;
+    } else {
+      els.emptyStateTitle.textContent = "No applications yet";
+      els.emptyStateBody.textContent = "Add your first job application to start tracking your search.";
+      els.emptyStateBtn.hidden = false;
+    }
+  }
+
+  els.tableWrap.hidden = !hasVisibleApplications;
+  els.cardList.hidden = !hasVisibleApplications;
+
+  renderTableRows(visible);
+  renderCardItems(visible);
+}
+
+function getFilteredAndSortedApplications() {
+  const query = els.searchInput.value.trim().toLowerCase();
+  const statusFilter = els.filterStatus.value;
+  const sourceFilter = els.filterSource.value;
+  const sortValue = els.sortBy.value;
+
+  let result = applications.filter((app) => {
+    const matchesQuery =
+      !query ||
+      (app.jobTitle || "").toLowerCase().includes(query) ||
+      (app.company || "").toLowerCase().includes(query);
+    const matchesStatus = !statusFilter || app.status === statusFilter;
+    const matchesSource = !sourceFilter || app.source === sourceFilter;
+    return matchesQuery && matchesStatus && matchesSource;
+  });
+
+  result.sort((a, b) => {
+    const diff = new Date(a.dateApplied) - new Date(b.dateApplied);
+    return sortValue === "date-asc" ? diff : -diff;
+  });
+
+  return result;
+}
+
+function renderTableRows(list) {
+  els.ledgerBody.innerHTML = "";
+
+  list.forEach((app) => {
+    const tr = document.createElement("tr");
+    tr.innerHTML = `
+      <td class="cell-title">${escapeHtml(app.jobTitle)}</td>
+      <td>${escapeHtml(app.company)}</td>
+      <td class="cell-muted">${escapeHtml(app.source)}</td>
+      <td class="cell-muted">${formatDate(app.dateApplied)}</td>
+      <td>${statusPillHtml(app.status)}</td>
+      <td class="cell-muted">${escapeHtml(app.workArrangement || "Not specified")}</td>
+      <td class="cell-actions"></td>
+    `;
+    const actionsCell = tr.querySelector(".cell-actions");
+    actionsCell.appendChild(makeRowActionButton("View", () => openDetails(app.id)));
+    actionsCell.appendChild(makeRowActionButton("Edit", () => openForm(app.id)));
+    actionsCell.appendChild(makeRowActionButton("Delete", () => openDeleteConfirm(app.id), true));
+    els.ledgerBody.appendChild(tr);
+  });
+}
+
+function renderCardItems(list) {
+  els.cardList.innerHTML = "";
+
+  list.forEach((app) => {
+    const card = document.createElement("div");
+    card.className = "app-card";
+    card.innerHTML = `
+      <div class="app-card__top">
+        <div>
+          <div class="app-card__title">${escapeHtml(app.jobTitle)}</div>
+          <div class="app-card__company">${escapeHtml(app.company)}</div>
+        </div>
+        ${statusPillHtml(app.status)}
+      </div>
+      <div class="app-card__meta">
+        <span>${escapeHtml(app.source)}</span>
+        <span>${formatDate(app.dateApplied)}</span>
+        <span>${escapeHtml(app.workArrangement || "Not specified")}</span>
+      </div>
+      <div class="app-card__actions"></div>
+    `;
+    const actionsCell = card.querySelector(".app-card__actions");
+    actionsCell.appendChild(makeRowActionButton("View", () => openDetails(app.id)));
+    actionsCell.appendChild(makeRowActionButton("Edit", () => openForm(app.id)));
+    actionsCell.appendChild(makeRowActionButton("Delete", () => openDeleteConfirm(app.id), true));
+    els.cardList.appendChild(card);
+  });
+}
+
+function makeRowActionButton(label, onClick, isDanger) {
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "row-action" + (isDanger ? " row-action--danger" : "");
+  btn.textContent = label;
+  btn.addEventListener("click", onClick);
+  return btn;
+}
+
+function statusPillHtml(status) {
+  const meta = STATUS_META[status] || { pill: "toapply" };
+  return `<span class="status-pill status-pill--${meta.pill}">${escapeHtml(status)}</span>`;
+}
+
+/* ---------------------------------------------------------
+   5. FORM (ADD / EDIT)
+   --------------------------------------------------------- */
+
+const formFieldIds = [
+  "jobTitle", "company", "source", "dateApplied", "status",
+  "jobUrl", "companyBackground", "jobDescription",
+  "requiredSkillsOther", "niceToHaveSkillsOther", "companyBenefits",
+  "clientBased", "workArrangement",
+  "employmentType", "salaryOffer", "salaryAsked", "notes",
+];
+
+function openForm(editId) {
+  els.appForm.reset();
+  clearAllFieldErrors();
+  els.formMsg.textContent = "";
+  els.formMsg.classList.remove("form-msg--error");
+
+  if (editId) {
+    const app = applications.find((a) => a.id === editId);
+    if (!app) return;
+    els.formPanelTitle.textContent = "Edit application";
+    document.getElementById("appId").value = app.id;
+    formFieldIds.forEach((field) => {
+      const el = document.getElementById(field);
+      if (el) el.value = app[field] || "";
+    });
+    setCheckedSkills(document.getElementById("requiredSkillsGrid"), app.requiredSkills);
+    setCheckedSkills(document.getElementById("niceToHaveSkillsGrid"), app.niceToHaveSkills);
+  } else {
+    els.formPanelTitle.textContent = "Add application";
+    document.getElementById("appId").value = "";
+  }
+
+  els.formOverlay.hidden = false;
+  document.getElementById("jobTitle").focus();
+}
+
+function closeForm() {
+  els.formOverlay.hidden = true;
+}
+
+function clearAllFieldErrors() {
+  document.querySelectorAll(".field__error").forEach((el) => (el.textContent = ""));
+  document.querySelectorAll(".has-error").forEach((el) => el.classList.remove("has-error"));
+}
+
+/**
+ * Validates the required fields and a couple of format checks.
+ * Returns an object of { fieldId: errorMessage } — empty object means valid.
+ */
+function validateForm(data) {
+  const errors = {};
+
+  if (!data.jobTitle.trim()) errors.jobTitle = "Job title is required.";
+  if (!data.company.trim()) errors.company = "Company name is required.";
+  if (!data.source) errors.source = "Please select where you applied.";
+  if (!data.dateApplied) errors.dateApplied = "Please select the date you applied.";
+  if (!data.status) errors.status = "Please select a status.";
+
+  if (data.jobUrl && !isLikelyValidUrl(data.jobUrl)) {
+    errors.jobUrl = "That doesn't look like a valid URL (include https://).";
+  }
+
+  return errors;
+}
+
+function isLikelyValidUrl(value) {
+  try {
+    const url = new URL(value);
+    return url.protocol === "http:" || url.protocol === "https:";
+  } catch {
+    return false;
+  }
+}
+
+function showFieldErrors(errors) {
+  clearAllFieldErrors();
+  Object.entries(errors).forEach(([field, message]) => {
+    const input = document.getElementById(field);
+    const errorEl = document.getElementById("err-" + field);
+    if (input) input.classList.add("has-error");
+    if (errorEl) errorEl.textContent = message;
+  });
+}
+
+function handleFormSubmit(event) {
+  event.preventDefault();
+
+  const data = {};
+  formFieldIds.forEach((field) => {
+    data[field] = document.getElementById(field).value;
+  });
+  data.requiredSkills = getCheckedSkills(document.getElementById("requiredSkillsGrid"));
+  data.niceToHaveSkills = getCheckedSkills(document.getElementById("niceToHaveSkillsGrid"));
+
+  const errors = validateForm(data);
+  if (Object.keys(errors).length > 0) {
+    showFieldErrors(errors);
+    els.formMsg.textContent = "";
+    els.formMsg.classList.remove("form-msg--error");
+    // Object key order matches the order fields are checked in validateForm(),
+    // which matches the visual top-to-bottom order of the form.
+    const firstInvalidField = document.getElementById(Object.keys(errors)[0]);
+    if (firstInvalidField) firstInvalidField.focus();
+    return;
+  }
+
+  const existingId = document.getElementById("appId").value;
+  const now = new Date().toISOString();
+
+  // Build the updated list first, without touching the real `applications`
+  // array yet — that way, if saving fails, the in-memory list and
+  // localStorage never fall out of sync with each other or with what
+  // the user is shown.
+  let updatedApplications;
+  if (existingId) {
+    updatedApplications = applications.map((a) =>
+      a.id === existingId ? { ...a, ...data, updatedAt: now } : a
+    );
+  } else {
+    updatedApplications = [
+      ...applications,
+      { id: generateId(), ...data, createdAt: now, updatedAt: now },
+    ];
+  }
+
+  const saved = saveApplications(updatedApplications);
+  if (!saved) {
+    els.formMsg.textContent = "Couldn't save — your browser's storage may be full or unavailable. Your entries are still in this form.";
+    els.formMsg.classList.add("form-msg--error");
+    return;
+  }
+
+  applications = updatedApplications;
+  renderAll();
+  closeForm();
+  showToast(existingId ? "Application updated." : "Application saved.", true);
+}
+
+function generateId() {
+  return "app_" + Date.now() + "_" + Math.random().toString(36).slice(2, 8);
+}
+
+/* ---------------------------------------------------------
+   6. DETAILS PANEL
+   --------------------------------------------------------- */
+
+function openDetails(id) {
+  const app = applications.find((a) => a.id === id);
+  if (!app) return;
+
+  currentDetailsId = id;
+
+  els.detailsBody.innerHTML = `
+    <div class="detail-grid">
+      ${detailField("Job title", app.jobTitle)}
+      ${detailField("Company", app.company)}
+      ${detailField("Source", app.source)}
+      ${detailField("Date applied", formatDate(app.dateApplied))}
+      ${detailField("Status", statusPillHtml(app.status), true)}
+      ${detailField("Client based", app.clientBased)}
+      ${detailField("Work arrangement", app.workArrangement)}
+      ${detailField("Employment type", app.employmentType)}
+      ${detailField("Salary offer", app.salaryOffer)}
+      ${detailField("Salary asked", app.salaryAsked)}
+    </div>
+    ${detailBlock("Job posting URL", app.jobUrl ? linkHtml(app.jobUrl) : "", true)}
+    ${detailBlock("Company background", app.companyBackground)}
+    ${detailBlock("Job description", app.jobDescription)}
+    ${detailBlock("Required skills", combineSkillsText(app.requiredSkills, app.requiredSkillsOther))}
+    ${detailBlock("Nice to have skills", combineSkillsText(app.niceToHaveSkills, app.niceToHaveSkillsOther))}
+    ${detailBlock("Company benefits", app.companyBenefits)}
+    ${detailBlock("Notes", app.notes)}
+  `;
+
+  els.detailsOverlay.hidden = false;
+}
+
+function detailField(label, value, isHtml) {
+  const displayValue = value
+    ? (isHtml ? value : escapeHtml(value))
+    : `<span class="detail-group__value--empty">Not specified</span>`;
+  return `
+    <div class="detail-group">
+      <div class="detail-group__label">${label}</div>
+      <div class="detail-group__value">${displayValue}</div>
+    </div>
+  `;
+}
+
+function detailBlock(label, value, isHtml) {
+  const displayValue = value
+    ? (isHtml ? value : escapeHtml(value).replace(/\n/g, "<br>"))
+    : `<span class="detail-group__value--empty">Not provided</span>`;
+  return `
+    <div class="detail-group">
+      <div class="detail-group__label">${label}</div>
+      <div class="detail-group__value">${displayValue}</div>
+    </div>
+  `;
+}
+
+/** Joins the checked skills with the free-text "Other" entry, for display. */
+function combineSkillsText(skillsArray, otherText) {
+  const parts = Array.isArray(skillsArray) ? [...skillsArray] : [];
+  if (otherText && otherText.trim()) parts.push(otherText.trim());
+  return parts.join(", ");
+}
+
+function linkHtml(url) {
+  return `<a href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${escapeHtml(url)}</a>`;
+}
+
+function closeDetails() {
+  els.detailsOverlay.hidden = true;
+  currentDetailsId = null;
+}
+
+/* ---------------------------------------------------------
+   7. DELETE CONFIRMATION
+   --------------------------------------------------------- */
+
+function openDeleteConfirm(id) {
+  pendingDeleteId = id;
+  els.deleteOverlay.hidden = false;
+}
+
+function closeDeleteConfirm() {
+  pendingDeleteId = null;
+  els.deleteOverlay.hidden = true;
+}
+
+function confirmDelete() {
+  if (!pendingDeleteId) return;
+  const updatedApplications = applications.filter((a) => a.id !== pendingDeleteId);
+  const saved = saveApplications(updatedApplications);
+  if (!saved) {
+    showToast("Couldn't delete — your browser's storage may be full or unavailable.");
+    closeDeleteConfirm();
+    return;
+  }
+  applications = updatedApplications;
+  renderAll();
+  closeDeleteConfirm();
+  closeDetails();
+  showToast("Application deleted.", true);
+}
+
+/* ---------------------------------------------------------
+   8. EXPORT TO JSON
+   --------------------------------------------------------- */
+
+function exportToJson() {
+  if (applications.length === 0) {
+    showToast("Nothing to export yet.");
+    return;
+  }
+
+  const blob = new Blob([JSON.stringify(applications, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  const dateStamp = new Date().toISOString().slice(0, 10);
+
+  a.href = url;
+  a.download = `jobtrack-ai-backup-${dateStamp}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+
+  showToast("Backup file downloaded.");
+}
+
+/* ---------------------------------------------------------
+   9. SMALL HELPERS
+   --------------------------------------------------------- */
+
+function formatDate(isoDate) {
+  if (!isoDate) return "—";
+  const date = new Date(isoDate + "T00:00:00");
+  if (isNaN(date)) return isoDate;
+  return date.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
+}
+
+// Prevents any saved text (job titles, notes, etc.) from being treated
+// as HTML when we insert it into the page — keeps the app safe from
+// broken markup, and from HTML/attribute injection via saved values
+// like the Job URL (which gets interpolated inside an href="...").
+function escapeHtml(value) {
+  return String(value == null ? "" : value)
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;")
+    .replaceAll("'", "&#39;");
+}
+
+let toastTimeout;
+function showToast(message, isSuccess) {
+  els.toast.textContent = message;
+  els.toast.classList.toggle("toast--success", !!isSuccess);
+  els.toast.hidden = false;
+  clearTimeout(toastTimeout);
+  toastTimeout = setTimeout(() => {
+    els.toast.hidden = true;
+  }, 2800);
+}
+
+/* ---------------------------------------------------------
+   10. EVENT LISTENERS
+   --------------------------------------------------------- */
+
+function attachEventListeners() {
+  // Open add form
+  els.addBtn.addEventListener("click", () => openForm(null));
+  els.emptyStateBtn.addEventListener("click", () => openForm(null));
+
+  // Close/cancel form
+  els.closeFormBtn.addEventListener("click", closeForm);
+  els.cancelFormBtn.addEventListener("click", closeForm);
+  els.appForm.addEventListener("submit", handleFormSubmit);
+
+  // Details panel
+  els.closeDetailsBtn.addEventListener("click", closeDetails);
+  els.detailsCloseBtn.addEventListener("click", closeDetails);
+  els.detailsEditBtn.addEventListener("click", () => {
+    const id = currentDetailsId;
+    closeDetails();
+    openForm(id);
+  });
+
+  // Delete confirmation
+  els.cancelDeleteBtn.addEventListener("click", closeDeleteConfirm);
+  els.confirmDeleteBtn.addEventListener("click", confirmDelete);
+
+  // Export
+  els.exportBtn.addEventListener("click", exportToJson);
+
+  // Search / filter / sort — re-render as the user types or picks options
+  els.searchInput.addEventListener("input", () => {
+    els.clearSearchBtn.hidden = els.searchInput.value.length === 0;
+    renderList();
+  });
+  els.clearSearchBtn.addEventListener("click", () => {
+    els.searchInput.value = "";
+    els.clearSearchBtn.hidden = true;
+    els.searchInput.focus();
+    renderList();
+  });
+  els.filterStatus.addEventListener("change", renderList);
+  els.filterSource.addEventListener("change", renderList);
+  els.sortBy.addEventListener("change", renderList);
+
+  els.resetFiltersBtn.addEventListener("click", () => {
+    els.searchInput.value = "";
+    els.clearSearchBtn.hidden = true;
+    els.filterStatus.value = "";
+    els.filterSource.value = "";
+    els.sortBy.value = "date-desc";
+    renderList();
+  });
+
+  // Clicking the dark overlay background (not the panel itself) closes it.
+  // The add/edit form is deliberately excluded: accidentally clicking outside
+  // it should never wipe out details you've already typed in. The close
+  // button (or Cancel) is the only way to dismiss that one.
+  [els.detailsOverlay, els.deleteOverlay].forEach((overlay) => {
+    overlay.addEventListener("click", (event) => {
+      if (event.target === overlay) {
+        overlay.hidden = true;
+        if (overlay === els.deleteOverlay) pendingDeleteId = null;
+        if (overlay === els.detailsOverlay) currentDetailsId = null;
+      }
+    });
+  });
+
+  // Escape key closes whichever panel is open. The add/edit form is
+  // excluded, same as the outside-click behavior above — Cancel or the
+  // close button are the only way to dismiss it, so a stray Escape
+  // press can't quietly discard what's been typed.
+  document.addEventListener("keydown", (event) => {
+    if (event.key !== "Escape") return;
+    if (!els.detailsOverlay.hidden) closeDetails();
+    else if (!els.deleteOverlay.hidden) closeDeleteConfirm();
+  });
+}
+
+/* ---------------------------------------------------------
+   Run it
+   --------------------------------------------------------- */
+init();
