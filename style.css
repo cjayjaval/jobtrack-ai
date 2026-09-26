@@ -7,16 +7,16 @@
   --border: #E1E4EA;
   --border-strong: #C7CCD6;
 
-  --ink: #1C2430;
+  --ink: #0E1A30;
   --ink-soft: #5B6472;
   --ink-faint: #8A94A6;
 
-  --primary: #35507A;
-  --primary-dark: #263C5C;
-  --primary-soft: #E9EEF5;
+  --primary: #1150BE;
+  --primary-dark: #0D3D8F;
+  --primary-soft: #E8EEFB;
 
-  --accent: #D98E04;
-  --accent-soft: #FBF0D9;
+  --accent: #1FA97F;
+  --accent-soft: #E1F5EE;
 
   --status-toapply-bg: #EEF0F3; --status-toapply-fg: #5B6472;
   --status-applied-bg: #E4EDFA; --status-applied-fg: #2C5C9E;
@@ -79,28 +79,10 @@ button { font-family: inherit; cursor: pointer; }
 
 .app-header__brand { display: flex; align-items: center; gap: 12px; }
 
-.app-header__mark {
-  display: grid; place-items: center;
-  width: 40px; height: 40px;
-  border-radius: var(--radius-sm);
-  background: var(--primary);
-  color: #fff;
-  font-family: var(--font-head);
-  font-weight: 700;
-  font-size: 14px;
-  flex-shrink: 0;
-}
-
-.app-header__title {
-  font-size: 20px;
-  font-weight: 700;
-  letter-spacing: -0.01em;
-}
-
-.app-header__subtitle {
-  margin: 2px 0 0;
-  color: var(--ink-soft);
-  font-size: 13px;
+.app-header__logo {
+  height: 40px;
+  width: auto;
+  display: block;
 }
 
 .app-header__actions { display: flex; gap: 10px; }
@@ -123,6 +105,27 @@ button { font-family: inherit; cursor: pointer; }
 
 .btn--primary { background: var(--primary); color: #fff; }
 .btn--primary:hover { background: var(--primary-dark); }
+
+/* Scoped to .btn--current-disabled specifically (applied only when an
+   analysis is already current — see js/resume.js), not to `:disabled`
+   in general: the Analyze/Re-analyze button is also briefly `disabled`
+   while loading or showing its success checkmark, and those transient
+   states should keep looking like an active blue button, not muted —
+   only "there's nothing to do right now" should look muted. The real
+   `disabled` attribute is what actually blocks the click/keyboard
+   activation in every case; this only makes the "current" case visually
+   honest. */
+.btn--current-disabled:disabled,
+.btn--current-disabled:disabled:hover {
+  background: var(--bg);
+  color: var(--ink-faint);
+  border-color: var(--border);
+  cursor: not-allowed;
+  box-shadow: none;
+}
+.btn--current-disabled:disabled:active {
+  transform: none;
+}
 
 .btn--ghost { background: transparent; border-color: var(--border-strong); color: var(--ink); }
 .btn--ghost:hover { background: var(--primary-soft); border-color: var(--primary); }
@@ -405,7 +408,23 @@ button { font-family: inherit; cursor: pointer; }
   background: var(--surface);
   display: flex;
   flex-direction: column;
+  position: relative; /* anchors .go-to-top-btn's absolute positioning in the details panel */
   box-shadow: -8px 0 24px rgba(28, 36, 48, 0.08);
+}
+
+/* Application Details AND the Add/Edit form both get this wider desktop
+   width — Details because it's now also the primary AI Job Match
+   workspace, and the form to match it visually and give its fields more
+   natural room. One shared rule rather than duplicating the clamp()
+   value in two places. clamp() keeps it fluid rather than a fixed pixel
+   value: ~40% of viewport in the typical desktop range (1200-1800px),
+   bounded so it neither shrinks below the old comfortable minimum nor
+   grows unreasonably wide on ultra-wide monitors. Overridden back to
+   full-width below 760px, matching this app's own existing
+   mobile-layout breakpoint. */
+#detailsOverlay .panel,
+#formOverlay .panel {
+  width: clamp(480px, 40vw, 720px);
 }
 
 .panel__header {
@@ -434,6 +453,38 @@ button { font-family: inherit; cursor: pointer; }
   flex-shrink: 0;
 }
 
+/* Sits above the footer (which is ~70px tall) with a comfortable margin,
+   so it never overlaps the Edit/Close buttons. Positioned relative to
+   .panel (see .panel's position:relative), not the scroll container, so
+   it stays put in the viewport while the content underneath scrolls. */
+.go-to-top-btn {
+  position: absolute;
+  right: 16px;
+  bottom: 84px;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface);
+  color: var(--ink-soft);
+  border: 1px solid var(--border-strong);
+  border-radius: 50%;
+  font-size: 16px;
+  line-height: 1;
+  box-shadow: 0 2px 8px rgba(28, 36, 48, 0.12);
+  cursor: pointer;
+  z-index: 5;
+}
+.go-to-top-btn:hover {
+  background: var(--primary-soft);
+  border-color: var(--primary);
+  color: var(--primary);
+}
+.go-to-top-btn[hidden] {
+  display: none;
+}
+
 /* =========================================================
    Form
    ========================================================= */
@@ -455,13 +506,35 @@ button { font-family: inherit; cursor: pointer; }
 
 .field-row {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  /* minmax(0, 1fr) instead of plain 1fr: a plain 1fr track still lets a
+     grid item's default min-width:auto (content-based) win, which is
+     exactly what caused the salary row to overflow — the browser refused
+     to shrink either column below its content's intrinsic width even
+     though the track itself was only ~1fr wide. */
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 12px;
 }
 
-.salary-input-group { display: flex; gap: 6px; }
+/* Belt-and-suspenders alongside minmax() above: every grid item in a
+   two-column field-row (Client based/Work arrangement, Salary offer/
+   Salary asked, etc.) is explicitly allowed to shrink below its content's
+   intrinsic width, rather than relying on the track sizing alone. */
+.field-row > .field { min-width: 0; }
 
-.salary-currency-select { width: 64px; flex-shrink: 0; }
+.salary-input-group {
+  display: flex;
+  width: 100%;
+  gap: 6px;
+  min-width: 0;
+}
+
+.salary-currency-select { flex: 0 0 64px; }
+
+/* min-width: 0 and flex-basis: 0 (via "flex: 1 1 0") together mean this
+   input is sized purely from the space left over after the fixed-width
+   currency select, never from its own default ~20-character intrinsic
+   width — which is what was overflowing the panel and clipping the field. */
+.salary-input-group input[type="text"] { flex: 1 1 0; min-width: 0; }
 
 .other-detail-field { margin-top: 8px; }
 
@@ -493,6 +566,19 @@ button { font-family: inherit; cursor: pointer; }
   height: 15px;
   accent-color: var(--primary);
   flex-shrink: 0;
+}
+
+/* A skill checked on one side disables its counterpart on the other —
+   :has() mutes the whole row (checkbox + label text) where supported;
+   the plain input:disabled rule is a fallback for browsers without it,
+   so the checkbox itself is still visibly muted either way. */
+.skills-grid__item input[type="checkbox"]:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+.skills-grid__item:has(input:disabled) {
+  color: var(--ink-faint);
+  cursor: not-allowed;
 }
 
 .skills-other { margin-top: 8px; }
@@ -601,6 +687,331 @@ button { font-family: inherit; cursor: pointer; }
 }
 
 /* =========================================================
+   AI Job Match (Phase 2)
+   ========================================================= */
+.ai-match-body {
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--border);
+}
+
+.ai-match__title {
+  font-size: 16px;
+  margin-bottom: 12px;
+}
+
+.btn--small { padding: 6px 10px; font-size: 12.5px; }
+
+.ai-match__resume-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--bg);
+  margin-bottom: 8px;
+}
+
+.ai-match__resume-info { font-size: 13.5px; overflow-wrap: anywhere; }
+.ai-match__resume-label { color: var(--ink-soft); margin-right: 4px; }
+.ai-match__resume-actions { display: flex; gap: 6px; flex-shrink: 0; }
+
+.ai-match__notice {
+  font-size: 13.5px;
+  color: var(--ink-soft);
+  background: var(--bg);
+  border: 1px dashed var(--border-strong);
+  border-radius: var(--radius-sm);
+  padding: 12px;
+}
+
+.ai-match__score {
+  text-align: center;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--bg);
+  margin-bottom: 16px;
+}
+
+.ai-match__score-value {
+  font-family: var(--font-head);
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--primary);
+}
+
+.ai-match__score-note {
+  font-size: 12.5px;
+  color: var(--ink-soft);
+  margin-top: 6px;
+}
+
+.ai-match__breakdown {
+  display: flex;
+  gap: 10px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.ai-match__breakdown-item {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 10px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.ai-match__breakdown-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.ai-match__breakdown-points {
+  font-size: 12px;
+  color: var(--ink-faint);
+}
+
+.ai-match__breakdown-pct {
+  font-family: var(--font-head);
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--primary);
+}
+
+.ai-match__group { margin-bottom: 16px; }
+
+.ai-match__group h4 {
+  font-family: var(--font-head);
+  font-size: 13px;
+  margin-bottom: 8px;
+}
+
+.ai-match__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Each group also has its own heading text ("Requirements Met" /
+   "Partial Matches" / "Missing / Not Evident"), so meaning never
+   depends on the border color alone — the color is a secondary cue. */
+.ai-match__list li {
+  border-left: 3px solid var(--ink-faint);
+  padding: 6px 10px;
+  font-size: 13.5px;
+  overflow-wrap: anywhere;
+}
+.ai-match__list--met li { border-left-color: var(--status-offer-fg); }
+.ai-match__list--partial li { border-left-color: var(--status-interview-fg); }
+.ai-match__list--missing li { border-left-color: var(--status-rejected-fg); }
+
+/* Title + priority badge sit inline together, wrapping naturally if the
+   panel is too narrow for both on one line — flex-wrap, not the
+   previous block-level <strong>, which forced the badge onto its own
+   line regardless of available width. */
+.ai-match__req-header {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 2px;
+}
+.ai-match__req-header strong {
+  min-width: 0; /* lets long titles wrap instead of forcing the row wider than available space — same fix as .field-row > .field above */
+}
+.ai-match__evidence, .ai-match__gap {
+  display: block;
+  color: var(--ink-soft);
+  font-size: 12.5px;
+}
+.ai-match__gap { color: var(--status-interview-fg); }
+
+/* Required/Optional priority badges next to a requirement's title.
+   Both share identical padding/border-thickness/font-weight/radius/size
+   — only the color triad (border + background fill + text) differs
+   between the two, each following dark-border + light-fill + dark-text
+   for contrast. Reuses existing design tokens rather than introducing
+   new ones: --status-offer-fg/bg (already a dark/pale green pair) for
+   Required, --primary/--primary-soft (already a dark/pale blue pair)
+   for Optional. Spacing from the title comes from .ai-match__req-header's
+   own gap, not a margin here, so it isn't doubled up. */
+.priority-badge {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  padding: 2px 10px;
+  border: 1.5px solid transparent;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.5;
+}
+.priority-badge--required {
+  background: var(--status-offer-bg);
+  border-color: var(--status-offer-fg);
+  color: var(--status-offer-fg);
+}
+.priority-badge--optional {
+  background: var(--primary-soft);
+  border-color: var(--primary);
+  color: var(--primary);
+}
+
+.ai-match__empty { font-size: 13px; color: var(--ink-faint); font-style: italic; }
+
+.ai-match__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  font-size: 12px;
+  color: var(--ink-faint);
+  margin-bottom: 12px;
+  overflow-wrap: anywhere;
+}
+
+.ai-match__stale-notice {
+  font-size: 13px;
+  color: var(--status-interview-fg);
+  background: var(--status-interview-bg);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  margin-bottom: 12px;
+}
+
+.ai-match__resume-hint {
+  font-size: 12px;
+  color: var(--ink-faint);
+  margin: 0 0 8px;
+}
+
+/* Analyze button's icon slot — collapses to nothing when idle (no icon
+   markup inserted) rather than being toggled via the hidden attribute,
+   since .btn's own display:flex would otherwise beat [hidden] the same
+   way .field's did before the .other-detail-field[hidden] fix above. */
+.ai-match__btn-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.ai-match__btn-icon:empty {
+  display: none;
+}
+
+.ai-match__spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: ai-match-spin 0.7s linear infinite;
+}
+
+@keyframes ai-match-spin {
+  to { transform: rotate(360deg); }
+}
+
+.ai-match__check {
+  font-size: 14px;
+  line-height: 1;
+  color: #fff;
+}
+
+.ai-match__current-notice {
+  font-size: 13px;
+  color: var(--status-offer-fg);
+  background: var(--status-offer-bg);
+  border-radius: var(--radius-sm);
+  padding: 8px 10px;
+  margin-bottom: 12px;
+}
+
+/* ---- Circular estimated-progress card (Analyze/Re-analyze loading state) ---- */
+
+.ai-match__progress {
+  text-align: center;
+  padding: 20px 12px;
+}
+
+.ai-match__progress-title {
+  font-family: var(--font-head);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--ink);
+  margin-bottom: 14px;
+}
+
+.ai-match__progress-ring-wrap {
+  position: relative;
+  width: 96px;
+  height: 96px;
+  margin: 0 auto 14px;
+}
+
+.ai-match__progress-ring {
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg); /* start the fill at 12 o'clock, not 3 o'clock */
+}
+
+.ai-match__progress-ring-track {
+  fill: none;
+  stroke: var(--border);
+  stroke-width: 8;
+}
+
+.ai-match__progress-ring-fill {
+  fill: none;
+  stroke: var(--primary);
+  stroke-width: 8;
+  stroke-linecap: round;
+  transition: stroke-dashoffset 0.3s ease-out;
+}
+
+.ai-match__progress-pct {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-head);
+  font-size: 19px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.ai-match__progress-status {
+  font-size: 13.5px;
+  color: var(--ink-soft);
+  margin-bottom: 4px;
+  min-height: 1.2em; /* avoids a small layout shift as messages of different lengths rotate in */
+}
+
+.ai-match__progress-note {
+  font-size: 12px;
+  color: var(--ink-faint);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ai-match__progress-ring-fill {
+    transition: none;
+  }
+}
+
+/* =========================================================
    Responsive
    ========================================================= */
 @media (max-width: 860px) {
@@ -611,6 +1022,8 @@ button { font-family: inherit; cursor: pointer; }
   .table-wrap { display: none; }
   .card-list { display: flex; }
   .card-list[hidden] { display: none; }
+  #detailsOverlay .panel,
+  #formOverlay .panel { width: 100%; }
 }
 
 @media (max-width: 520px) {
@@ -619,4 +1032,6 @@ button { font-family: inherit; cursor: pointer; }
   .field-row { grid-template-columns: 1fr; }
   .detail-grid { grid-template-columns: 1fr; }
   .summary { grid-template-columns: 1fr 1fr; }
+  .ai-match__resume-row { flex-direction: column; align-items: stretch; }
+  .ai-match__resume-actions { justify-content: flex-end; }
 }

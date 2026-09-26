@@ -1,0 +1,17 @@
+{
+  "name": "jobtrack-ai-backend",
+  "version": "0.3.0",
+  "private": true,
+  "description": "Backend API for JobTrack AI's Phase 2 AI Job Match Analysis feature. The frontend (index.html/style.css/script.js/js/) is a static site deployed separately on GitHub Pages and does not need this to run.",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "openai": "^4.60.0"
+  }
+}

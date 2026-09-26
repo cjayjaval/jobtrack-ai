@@ -16,20 +16,24 @@
 const STORAGE_KEY = "jobtrackai_applications";
 
 // Current app version, included in JSON exports to prepare for a future import feature.
-const APP_VERSION = "0.2.0";
+const APP_VERSION = "0.3.0";
 
 // The full list of statuses, in the order they should progress.
 const STATUSES = [
   "To Apply",
   "Applied",
-  "Initial Interview",
-  "Technical Interview",
-  "Final Interview",
+  "For Initial Interview",
+  "For Technical Interview",
+  "For Final Interview",
   "Offered",
   "Ghosted",
   "Rejected",
   "Withdrawn",
+  "Failed",
 ];
+
+// The statuses that trigger the conditional "Date of Interview" field.
+const INTERVIEW_STATUSES = ["For Initial Interview", "For Technical Interview", "For Final Interview"];
 
 const SOURCES = [
   "LinkedIn", "Indeed", "JobStreet", "OnlineJobsPH", "Kalibrr",
@@ -50,6 +54,11 @@ const SKILLS = [
 const STATUS_META = {
   "To Apply":           { pill: "toapply",   bucket: "toapply" },
   "Applied":             { pill: "applied",   bucket: "applied" },
+  "For Initial Interview":   { pill: "interview", bucket: "interview" },
+  "For Technical Interview": { pill: "interview", bucket: "interview" },
+  "For Final Interview":     { pill: "interview", bucket: "interview" },
+  // Legacy values, kept so applications saved before the interview-status
+  // rename still display and count correctly even if migration hasn't run.
   "Initial Interview":   { pill: "interview", bucket: "interview" },
   "Technical Interview": { pill: "interview", bucket: "interview" },
   "Final Interview":     { pill: "interview", bucket: "interview" },
@@ -58,6 +67,7 @@ const STATUS_META = {
   "Ghosted":              { pill: "withdrawn", bucket: "ghosted" },
   "Rejected":             { pill: "rejected",  bucket: "rejected" },
   "Withdrawn":            { pill: "withdrawn", bucket: "withdrawn" },
+  "Failed":               { pill: "rejected",  bucket: "failed" },
 };
 
 /**
@@ -142,16 +152,32 @@ function commitAppNumber(n) {
 }
 
 /**
- * One-time data migration: any application still saved with the old
- * "Offer" status (from before it was renamed to "Offered") gets updated
- * in localStorage itself, not just displayed correctly at runtime.
+ * Maps every old status value that's been renamed to its current value.
+ * One-time data migration (below) uses this so each renamed status is
+ * handled the same way, and so adding a future rename only means adding
+ * one line here rather than writing a new migration function.
  */
-function migrateLegacyOfferStatus(apps) {
+const LEGACY_STATUS_MIGRATIONS = {
+  "Offer": "Offered",
+  "Initial Interview": "For Initial Interview",
+  "Technical Interview": "For Technical Interview",
+  "Final Interview": "For Final Interview",
+};
+
+/**
+ * One-time data migration: any application still saved with an old status
+ * value (from before a rename) gets updated in localStorage itself, not
+ * just displayed correctly at runtime. Safe to run on every load — only
+ * old values are keys in LEGACY_STATUS_MIGRATIONS, so already-migrated
+ * applications are left untouched and nothing is written unnecessarily.
+ */
+function migrateLegacyStatuses(apps) {
   let didMigrate = false;
   const migrated = apps.map((app) => {
-    if (app.status === "Offer") {
+    const newStatus = LEGACY_STATUS_MIGRATIONS[app.status];
+    if (newStatus) {
       didMigrate = true;
-      return { ...app, status: "Offered" };
+      return { ...app, status: newStatus };
     }
     return app;
   });
@@ -160,7 +186,7 @@ function migrateLegacyOfferStatus(apps) {
 }
 
 // In-memory copy of the applications, kept in sync with localStorage.
-let applications = migrateLegacyOfferStatus(loadApplications());
+let applications = migrateLegacyStatuses(loadApplications());
 
 /* ---------------------------------------------------------
    2. DOM REFERENCES
@@ -205,6 +231,8 @@ const els = {
 
   // details panel
   detailsOverlay: document.getElementById("detailsOverlay"),
+  detailsScrollArea: document.getElementById("detailsScrollArea"),
+  detailsGoToTopBtn: document.getElementById("detailsGoToTopBtn"),
   detailsBody: document.getElementById("detailsBody"),
   detailsEditBtn: document.getElementById("detailsEditBtn"),
   closeDetailsBtn: document.getElementById("closeDetailsBtn"),
@@ -262,6 +290,81 @@ function setCheckedSkills(gridEl, skills) {
   });
 }
 
+/** Finds a skill checkbox in a grid by its underlying value (the skill string), not by position/index. */
+function findSkillCheckboxByValue(gridEl, value) {
+  return Array.from(gridEl.querySelectorAll('input[type="checkbox"]')).find((cb) => cb.value === value) || null;
+}
+
+/**
+ * Finds a skill checkbox's counterpart in the OTHER grid (Required <->
+ * Nice-to-Have) — same skill value, opposite list. Matching is always
+ * by value, never by DOM position, so this stays correct even if the
+ * two grids were ever populated in a different order from each other.
+ */
+function findCounterpartSkillCheckbox(checkboxEl) {
+  const requiredGrid = document.getElementById("requiredSkillsGrid");
+  const niceGrid = document.getElementById("niceToHaveSkillsGrid");
+  const sourceGrid = checkboxEl.closest(".skills-grid");
+  const otherGrid = sourceGrid === requiredGrid ? niceGrid : requiredGrid;
+  if (!otherGrid) return null;
+  return findSkillCheckboxByValue(otherGrid, checkboxEl.value);
+}
+
+/**
+ * Enforces mutual exclusion for one skill checkbox: its counterpart in
+ * the other grid becomes disabled exactly when this one is checked, and
+ * re-enabled when it's unchecked. Only ever touches the ONE matching
+ * counterpart — unrelated skills are never affected.
+ */
+function syncSkillMutualExclusion(checkboxEl) {
+  const counterpart = findCounterpartSkillCheckbox(checkboxEl);
+  if (!counterpart) return;
+  counterpart.disabled = checkboxEl.checked;
+}
+
+/** Delegated change handler for both skill grids — keeps the counterpart's disabled state in sync the instant a checkbox is toggled. */
+function handleSkillCheckboxChange(event) {
+  if (!event.target.matches('input[type="checkbox"]')) return;
+  syncSkillMutualExclusion(event.target);
+}
+
+/**
+ * Recomputes disabled state for every checkbox in both skill grids from
+ * their current checked state. Order-independent — call this any time
+ * both grids' checked states may have changed out from under the live
+ * change-listener (populating the Edit form, or resetting for a new
+ * application, since form.reset() clears checked state but not
+ * dynamically-set `disabled` attributes left over from a prior session).
+ */
+function reconcileSkillMutualExclusion() {
+  const requiredGrid = document.getElementById("requiredSkillsGrid");
+  const niceGrid = document.getElementById("niceToHaveSkillsGrid");
+  if (!requiredGrid || !niceGrid) return;
+  requiredGrid.querySelectorAll('input[type="checkbox"]').forEach(syncSkillMutualExclusion);
+  niceGrid.querySelectorAll('input[type="checkbox"]').forEach(syncSkillMutualExclusion);
+}
+
+/**
+ * Legacy-data safety net: an application saved before this mutual-
+ * exclusion UI existed could have the same skill checked under both
+ * Required and Nice-to-Have. Required wins in the UI — this unchecks
+ * the Nice-to-Have duplicate in the FORM only (a DOM change to the
+ * checkboxes). The saved application itself is untouched; the cleanup
+ * only becomes real if the user goes on to explicitly save the form.
+ */
+function resolveSkillConflicts() {
+  const requiredGrid = document.getElementById("requiredSkillsGrid");
+  const niceGrid = document.getElementById("niceToHaveSkillsGrid");
+  if (!requiredGrid || !niceGrid) return;
+
+  requiredGrid.querySelectorAll('input[type="checkbox"]:checked').forEach((requiredCb) => {
+    const niceCb = findSkillCheckboxByValue(niceGrid, requiredCb.value);
+    if (niceCb && niceCb.checked) {
+      niceCb.checked = false;
+    }
+  });
+}
+
 /**
  * Fills a <select> with <option> elements from a list of strings,
  * keeping whatever "All ___" default option is already first.
@@ -286,7 +389,7 @@ function renderAll() {
 }
 
 function renderSummary() {
-  const counts = { toapply: 0, applied: 0, interview: 0, offer: 0, rejected: 0, withdrawn: 0, ghosted: 0 };
+  const counts = { toapply: 0, applied: 0, interview: 0, offer: 0, rejected: 0, withdrawn: 0, ghosted: 0, failed: 0 };
 
   applications.forEach((app) => {
     const meta = STATUS_META[app.status];
@@ -368,7 +471,7 @@ function renderTableRows(list) {
       <td class="cell-actions"></td>
     `;
     const actionsCell = tr.querySelector(".cell-actions");
-    actionsCell.appendChild(makeRowActionButton("View", () => openDetails(app.id)));
+    actionsCell.appendChild(makeRowActionButton("Analyze", () => openDetails(app.id, { scrollToAnalysis: true })));
     actionsCell.appendChild(makeRowActionButton("Edit", () => openForm(app.id)));
     actionsCell.appendChild(makeRowActionButton("Delete", () => openDeleteConfirm(app.id), true));
     els.ledgerBody.appendChild(tr);
@@ -398,7 +501,7 @@ function renderCardItems(list) {
       <div class="app-card__actions"></div>
     `;
     const actionsCell = card.querySelector(".app-card__actions");
-    actionsCell.appendChild(makeRowActionButton("View", () => openDetails(app.id)));
+    actionsCell.appendChild(makeRowActionButton("Analyze", () => openDetails(app.id, { scrollToAnalysis: true })));
     actionsCell.appendChild(makeRowActionButton("Edit", () => openForm(app.id)));
     actionsCell.appendChild(makeRowActionButton("Delete", () => openDeleteConfirm(app.id), true));
     els.cardList.appendChild(card);
@@ -424,12 +527,12 @@ function statusPillHtml(status) {
    --------------------------------------------------------- */
 
 const formFieldIds = [
-  "jobTitle", "company", "source", "sourceOther", "dateApplied", "status",
+  "jobTitle", "company", "source", "sourceOther", "dateApplied", "status", "interviewDate",
   "jobUrl", "companyBackground", "jobDescription",
   "requiredSkillsOther", "niceToHaveSkillsOther", "companyBenefits",
   "clientBased", "clientBasedOther", "workArrangement",
   "employmentType", "employmentTypeMonths", "salaryOfferCurrency", "salaryOffer",
-  "salaryAskedCurrency", "salaryAsked", "notes",
+  "salaryAskedCurrency", "salaryAsked", "actualSalaryOfferCurrency", "actualSalaryOffer", "notes",
 ];
 
 function openForm(editId) {
@@ -453,17 +556,28 @@ function openForm(editId) {
     // select with nothing chosen.
     document.getElementById("salaryOfferCurrency").value = app.salaryOfferCurrency || "₱";
     document.getElementById("salaryAskedCurrency").value = app.salaryAskedCurrency || "₱";
+    document.getElementById("actualSalaryOfferCurrency").value = app.actualSalaryOfferCurrency || "₱";
     setCheckedSkills(document.getElementById("requiredSkillsGrid"), app.requiredSkills);
     setCheckedSkills(document.getElementById("niceToHaveSkillsGrid"), app.niceToHaveSkills);
+    resolveSkillConflicts();
   } else {
     els.formPanelTitle.textContent = "Add application";
     document.getElementById("appId").value = "";
     document.getElementById("appNumberDisplay").value = "";
   }
 
+  // Recomputes each grid's disabled state from current checked state —
+  // needed for the Edit case (fresh selections just populated above) and
+  // the Add case too, since form.reset() at the top of this function
+  // clears checked state but not any `disabled` attribute a previous
+  // form session left set.
+  reconcileSkillMutualExclusion();
+
   syncOtherField(document.getElementById("source"), document.getElementById("sourceOtherWrap"));
   syncOtherField(document.getElementById("clientBased"), document.getElementById("clientBasedOtherWrap"));
   syncEmploymentTypeMonthsField();
+  syncInterviewDateField();
+  syncActualSalaryOfferField();
 
   els.formOverlay.hidden = false;
   document.getElementById("jobTitle").focus();
@@ -478,6 +592,18 @@ function syncOtherField(selectEl, wrapperEl) {
 function syncEmploymentTypeMonthsField() {
   document.getElementById("employmentTypeMonthsWrap").hidden =
     document.getElementById("employmentType").value !== "Project-based";
+}
+
+/** Shows/hides the "Date of Interview" field based on whether the status is one of the interview statuses. */
+function syncInterviewDateField() {
+  document.getElementById("interviewDateWrap").hidden =
+    !INTERVIEW_STATUSES.includes(document.getElementById("status").value);
+}
+
+/** Shows/hides the "Actual Salary Offer" field group based on whether the status is Offered. */
+function syncActualSalaryOfferField() {
+  document.getElementById("actualSalaryOfferWrap").hidden =
+    document.getElementById("status").value !== "Offered";
 }
 
 function closeForm() {
@@ -605,6 +731,11 @@ function handleFormSubmit(event) {
   if (data.source !== "Other") data.sourceOther = "";
   if (data.clientBased !== "Other") data.clientBasedOther = "";
   if (data.employmentType !== "Project-based") data.employmentTypeMonths = "";
+  if (!INTERVIEW_STATUSES.includes(data.status)) data.interviewDate = "";
+  if (data.status !== "Offered") {
+    data.actualSalaryOffer = "";
+    data.actualSalaryOfferCurrency = "";
+  }
 
   const errors = validateForm(data);
   if (Object.keys(errors).length > 0) {
@@ -665,9 +796,11 @@ function generateId() {
    6. DETAILS PANEL
    --------------------------------------------------------- */
 
-function openDetails(id) {
+function openDetails(id, options) {
   const app = applications.find((a) => a.id === id);
   if (!app) return;
+
+  const scrollToAnalysis = !!(options && options.scrollToAnalysis);
 
   currentDetailsId = id;
 
@@ -679,11 +812,13 @@ function openDetails(id) {
       ${detailField("Source", formatSourceDisplay(app.source, app.sourceOther))}
       ${detailField("Date applied", formatDate(app.dateApplied))}
       ${detailField("Status", statusPillHtml(app.status), true)}
+      ${app.interviewDate ? detailField("Date of Interview", formatDate(app.interviewDate)) : ""}
       ${detailField("Client based", formatClientBasedDisplay(app.clientBased, app.clientBasedOther))}
       ${detailField("Work arrangement", app.workArrangement)}
       ${detailField("Employment type", formatEmploymentTypeDisplay(app.employmentType, app.employmentTypeMonths))}
       ${detailField("Salary offer", formatSalaryDisplay(app.salaryOfferCurrency, app.salaryOffer))}
       ${detailField("Salary asked", formatSalaryDisplay(app.salaryAskedCurrency, app.salaryAsked))}
+      ${app.actualSalaryOffer ? detailField("Actual Salary Offer", formatSalaryDisplay(app.actualSalaryOfferCurrency, app.actualSalaryOffer)) : ""}
     </div>
     ${detailBlock("Job posting URL", app.jobUrl ? linkHtml(app.jobUrl) : "", true)}
     ${detailBlock("Company background", app.companyBackground)}
@@ -695,6 +830,60 @@ function openDetails(id) {
   `;
 
   els.detailsOverlay.hidden = false;
+
+  // Phase 2 hook: renders the AI Job Match section for this application.
+  // Guarded so Phase 1 keeps working unchanged if js/resume.js isn't loaded.
+  if (typeof renderAiJobMatchSection === "function") {
+    renderAiJobMatchSection(app);
+  }
+
+  if (scrollToAnalysis) scrollDetailsToAiSection();
+  updateGoToTopVisibility();
+}
+
+/**
+ * Scrolls the details panel's own scroll container (never the underlying
+ * page) down to the AI Job Match section, used when the user enters
+ * through the "Analyze" action specifically. Deferred a frame so layout
+ * has settled after unhiding the overlay and rendering fresh content —
+ * measuring immediately after `hidden = false` can read stale (zero)
+ * geometry in some browsers. Re-checks both elements still exist inside
+ * the deferred callback, since the user could close the panel before it
+ * runs.
+ */
+function scrollDetailsToAiSection() {
+  requestAnimationFrame(() => {
+    const scrollArea = els.detailsScrollArea;
+    const target = document.getElementById("aiMatchBody");
+    if (!scrollArea || !target) return;
+
+    const scrollAreaRect = scrollArea.getBoundingClientRect();
+    const targetRect = target.getBoundingClientRect();
+    const relativeTop = targetRect.top - scrollAreaRect.top + scrollArea.scrollTop;
+
+    scrollArea.scrollTo({ top: Math.max(0, relativeTop), behavior: "smooth" });
+  });
+}
+
+// How far down the panel the user must scroll before the "go to top"
+// control appears — keeps it from showing for a trivial amount of overflow.
+const GO_TO_TOP_SHOW_THRESHOLD_PX = 200;
+
+/**
+ * Shows/hides the go-to-top control based on whether the details panel's
+ * content actually overflows AND whether the user has scrolled down far
+ * enough to make it useful. Called after any render that could change
+ * the panel's content height (open, resume changes, AI results
+ * appearing/updating, loading-state swaps) and on scroll/resize.
+ */
+function updateGoToTopVisibility() {
+  const scrollArea = els.detailsScrollArea;
+  const btn = els.detailsGoToTopBtn;
+  if (!scrollArea || !btn) return;
+
+  const isScrollable = scrollArea.scrollHeight > scrollArea.clientHeight;
+  const scrolledDown = scrollArea.scrollTop > GO_TO_TOP_SHOW_THRESHOLD_PX;
+  btn.hidden = !(isScrollable && scrolledDown);
 }
 
 function detailField(label, value, isHtml) {
@@ -872,6 +1061,12 @@ function attachEventListeners() {
   els.cancelFormBtn.addEventListener("click", closeForm);
   els.appForm.addEventListener("submit", handleFormSubmit);
 
+  // Required/Nice-to-Have skill checkboxes: checking one disables its
+  // matching counterpart in the other grid, live, per-skill (delegated
+  // so this covers every checkbox without one listener each).
+  document.getElementById("requiredSkillsGrid").addEventListener("change", handleSkillCheckboxChange);
+  document.getElementById("niceToHaveSkillsGrid").addEventListener("change", handleSkillCheckboxChange);
+
   Object.keys(FIELD_RULES).forEach((field) => {
     const el = document.getElementById(field);
     if (!el) return;
@@ -891,6 +1086,10 @@ function attachEventListeners() {
     syncEmploymentTypeMonthsField();
     clearFieldErrorIfNowValid("employmentTypeMonths");
   });
+  document.getElementById("status").addEventListener("change", () => {
+    syncInterviewDateField();
+    syncActualSalaryOfferField();
+  });
 
   // Details panel
   els.closeDetailsBtn.addEventListener("click", closeDetails);
@@ -900,6 +1099,15 @@ function attachEventListeners() {
     closeDetails();
     openForm(id);
   });
+
+  // Go-to-top control: scrolls the PANEL's own scroll container, never
+  // the underlying page, and stays in sync with actual overflow/scroll
+  // position rather than a fixed open/close toggle.
+  els.detailsGoToTopBtn.addEventListener("click", () => {
+    els.detailsScrollArea.scrollTo({ top: 0, behavior: "smooth" });
+  });
+  els.detailsScrollArea.addEventListener("scroll", updateGoToTopVisibility);
+  window.addEventListener("resize", updateGoToTopVisibility);
 
   // Delete confirmation
   els.cancelDeleteBtn.addEventListener("click", closeDeleteConfirm);

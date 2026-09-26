@@ -8,17 +8,15 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="style.css">
+<!-- pdf.js: used client-side only to extract resume text for AI Job Match (Phase 2). The raw PDF file never leaves the browser. -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 </head>
 <body>
 
   <!-- ===== Header ===== -->
   <header class="app-header">
     <div class="app-header__brand">
-      <span class="app-header__mark">JT</span>
-      <div>
-        <h1 class="app-header__title">JobTrack AI</h1>
-        <p class="app-header__subtitle">Your job search, organized in one place</p>
-      </div>
+      <img class="app-header__logo" src="assets/logo.png" alt="JobTrack AI — Track Every Application. Land the Right Match.">
     </div>
     <div class="app-header__actions">
       <button type="button" class="btn btn--ghost" id="exportBtn">Export backup</button>
@@ -194,15 +192,30 @@
               <option value="">Select a status</option>
               <option>To Apply</option>
               <option>Applied</option>
-              <option>Initial Interview</option>
-              <option>Technical Interview</option>
-              <option>Final Interview</option>
+              <option>For Initial Interview</option>
+              <option>For Technical Interview</option>
+              <option>For Final Interview</option>
               <option>Offered</option>
               <option>Ghosted</option>
               <option>Rejected</option>
               <option>Withdrawn</option>
+              <option>Failed</option>
             </select>
             <p class="field__error" id="err-status"></p>
+            <div class="field other-detail-field" id="interviewDateWrap" hidden>
+              <label for="interviewDate">Date of Interview</label>
+              <input type="date" id="interviewDate">
+            </div>
+            <div class="field other-detail-field" id="actualSalaryOfferWrap" hidden>
+              <label for="actualSalaryOffer">Actual Salary Offer</label>
+              <div class="salary-input-group">
+                <select id="actualSalaryOfferCurrency" class="salary-currency-select">
+                  <option value="₱" selected>₱</option>
+                  <option value="$">$</option>
+                </select>
+                <input type="text" id="actualSalaryOffer" placeholder="e.g. 55,000/mo">
+              </div>
+            </div>
           </div>
         </div>
 
@@ -339,9 +352,15 @@
         <h2 id="detailsPanelTitle">Application details</h2>
         <button type="button" class="icon-btn" id="closeDetailsBtn" aria-label="Close">✕</button>
       </div>
-      <div class="panel__body" id="detailsBody">
-        <!-- injected by script.js -->
+      <div class="panel__body" id="detailsScrollArea">
+        <div id="detailsBody">
+          <!-- injected by script.js -->
+        </div>
+        <div id="aiMatchBody" class="ai-match-body">
+          <!-- injected by js/resume.js -->
+        </div>
       </div>
+      <button type="button" class="go-to-top-btn" id="detailsGoToTopBtn" aria-label="Go to top" title="Go to top" hidden>↑</button>
       <div class="panel__footer">
         <button type="button" class="btn btn--text" id="detailsEditBtn">Edit</button>
         <button type="button" class="btn btn--primary" id="detailsCloseBtn">Close</button>
@@ -365,5 +384,6 @@
   <div class="toast" id="toast" role="status" hidden></div>
 
   <script src="script.js"></script>
+  <script src="js/resume.js"></script>
 </body>
 </html>
