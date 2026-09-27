@@ -759,6 +759,10 @@ button { font-family: inherit; cursor: pointer; }
 /* =========================================================
    AI Job Match (Phase 2)
    ========================================================= */
+#aiMatchStatus {
+  white-space: pre-line;
+}
+
 .ai-match-body {
   margin-top: 24px;
   padding-top: 20px;
