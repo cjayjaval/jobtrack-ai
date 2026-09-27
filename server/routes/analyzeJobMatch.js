@@ -173,7 +173,7 @@ router.post("/analyze-job-match", async (req, res, next) => {
       const freshValidation = validateFreshCanonicalRequirements(freshRaw);
       if (!freshValidation.valid) {
         console.error("Invalid Stage A response shape:", freshValidation.reason);
-        return res.status(502).json({ error: "The analysis returned an invalid response." });
+        return res.status(502).json({ error: "Not enough job requirements could be identified. \nAdd more details to the job description or select Required/Nice-to-have skills, then try again." });
       }
 
       canonicalRequirements = assignCanonicalRequirementIds(freshValidation.data);
