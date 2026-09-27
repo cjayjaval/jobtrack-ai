@@ -196,13 +196,16 @@ const els = {
   // header
   addBtn: document.getElementById("addBtn"),
   exportBtn: document.getElementById("exportBtn"),
+  howToUseBtn: document.getElementById("howToUseBtn"),
+  howToUseOverlay: document.getElementById("howToUseOverlay"),
+  closeHowToUseBtn: document.getElementById("closeHowToUseBtn"),
 
   // summary
   statTotal: document.getElementById("statTotal"),
   statApplied: document.getElementById("statApplied"),
   statInterview: document.getElementById("statInterview"),
   statOffer: document.getElementById("statOffer"),
-  statRejected: document.getElementById("statRejected"),
+  statFailed: document.getElementById("statFailed"),
 
   // toolbar
   searchInput: document.getElementById("searchInput"),
@@ -400,7 +403,7 @@ function renderSummary() {
   els.statApplied.textContent = counts.applied;
   els.statInterview.textContent = counts.interview;
   els.statOffer.textContent = counts.offer;
-  els.statRejected.textContent = counts.rejected;
+  els.statFailed.textContent = counts.failed;
 }
 
 /** Applies search + filters + sort, then draws the table and card list. */
@@ -970,6 +973,14 @@ function closeDeleteConfirm() {
   els.deleteOverlay.hidden = true;
 }
 
+function openHowToUse() {
+  els.howToUseOverlay.hidden = false;
+}
+
+function closeHowToUse() {
+  els.howToUseOverlay.hidden = true;
+}
+
 function confirmDelete() {
   if (!pendingDeleteId) return;
   const updatedApplications = applications.filter((a) => a.id !== pendingDeleteId);
@@ -1054,6 +1065,8 @@ function showToast(message, isSuccess) {
 function attachEventListeners() {
   // Open add form
   els.addBtn.addEventListener("click", () => openForm(null));
+  els.howToUseBtn.addEventListener("click", openHowToUse);
+  els.closeHowToUseBtn.addEventListener("click", closeHowToUse);
   els.emptyStateBtn.addEventListener("click", () => openForm(null));
 
   // Close/cancel form
@@ -1144,7 +1157,7 @@ function attachEventListeners() {
   // The add/edit form is deliberately excluded: accidentally clicking outside
   // it should never wipe out details you've already typed in. The close
   // button (or Cancel) is the only way to dismiss that one.
-  [els.detailsOverlay, els.deleteOverlay].forEach((overlay) => {
+  [els.detailsOverlay, els.deleteOverlay, els.howToUseOverlay].forEach((overlay) => {
     overlay.addEventListener("click", (event) => {
       if (event.target === overlay) {
         overlay.hidden = true;
@@ -1162,6 +1175,7 @@ function attachEventListeners() {
     if (event.key !== "Escape") return;
     if (!els.detailsOverlay.hidden) closeDetails();
     else if (!els.deleteOverlay.hidden) closeDeleteConfirm();
+    else if (!els.howToUseOverlay.hidden) closeHowToUse();
   });
 }
 

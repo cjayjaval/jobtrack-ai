@@ -19,6 +19,7 @@
       <img class="app-header__logo" src="assets/logo.png" alt="JobTrack AI — Track Every Application. Land the Right Match.">
     </div>
     <div class="app-header__actions">
+      <button type="button" class="btn btn--ghost" id="howToUseBtn">How to use</button>
       <button type="button" class="btn btn--ghost" id="exportBtn">Export backup</button>
       <button type="button" class="btn btn--primary" id="addBtn">+ Add application</button>
     </div>
@@ -44,9 +45,9 @@
         <span class="summary-card__label">Offer</span>
         <span class="summary-card__value" id="statOffer">0</span>
       </div>
-      <div class="summary-card summary-card--rejected" data-stat="rejected">
-        <span class="summary-card__label">Rejected</span>
-        <span class="summary-card__value" id="statRejected">0</span>
+      <div class="summary-card summary-card--rejected" data-stat="failed">
+        <span class="summary-card__label">Failed</span>
+        <span class="summary-card__value" id="statFailed">0</span>
       </div>
     </section>
 
@@ -368,6 +369,40 @@
     </div>
   </div>
 
+  <!-- ===== How to Use ===== -->
+  <div class="overlay overlay--center" id="howToUseOverlay" hidden>
+    <div class="how-to-use-box" role="dialog" aria-modal="true" aria-labelledby="howToUseTitle">
+      <div class="panel__header">
+        <h2 id="howToUseTitle">How to Use JobTrack AI</h2>
+        <button type="button" class="icon-btn" id="closeHowToUseBtn" aria-label="Close">✕</button>
+      </div>
+      <div class="how-to-use__body">
+        <ol class="how-to-use__steps">
+          <li class="how-to-use__step">
+            <span class="how-to-use__step-number">1</span>
+            <h3>Add Application</h3>
+            <p>Save company, role, job description, and requirements.</p>
+          </li>
+          <li class="how-to-use__step">
+            <span class="how-to-use__step-number">2</span>
+            <h3>Upload Resume</h3>
+            <p>Upload a PDF resume for Job Match analysis.</p>
+          </li>
+          <li class="how-to-use__step">
+            <span class="how-to-use__step-number">3</span>
+            <h3>Analyze Match</h3>
+            <p>Compare the resume against job requirements.</p>
+          </li>
+          <li class="how-to-use__step">
+            <span class="how-to-use__step-number">4</span>
+            <h3>Track Progress</h3>
+            <p>Update application status and manage the job search.</p>
+          </li>
+        </ol>
+      </div>
+    </div>
+  </div>
+
   <!-- ===== Delete confirmation ===== -->
   <div class="overlay overlay--center" id="deleteOverlay" hidden>
     <div class="confirm-box" role="alertdialog" aria-modal="true" aria-labelledby="deleteTitle">
@@ -382,13 +417,6 @@
 
   <!-- ===== Toast ===== -->
   <div class="toast" id="toast" role="status" hidden></div>
-
-  <script>
-    if (window.location.hostname === "cjayjaval.github.io") {
-      window.JOBTRACK_AI_BACKEND_URL =
-        "https://jobtrack-ai-api-ju4b.onrender.com";
-    }
-  </script>
 
   <script src="script.js"></script>
   <script src="js/resume.js"></script>

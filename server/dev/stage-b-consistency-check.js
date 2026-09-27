@@ -4,7 +4,7 @@
  *
  * Measures Stage B (resume-evidence classification) consistency in
  * isolation: fixed resume + fixed canonical requirements (from
- * server/dev/stage-b-fixture.js), run through Stage B repeatedly. Stage
+ * server/dev/stage-b-fixture.local.js), run through Stage B repeatedly. Stage
  * A is never involved — this file does not import canonicalizeRequirements
  * anywhere, so there is no code path here that could regenerate
  * canonical requirements even by mistake. Any variation this harness
@@ -23,7 +23,7 @@
  *   node dev/stage-b-consistency-check.js
  *   node dev/stage-b-consistency-check.js --runs=10
  *
- * REQUIRES: server/dev/stage-b-fixture.js filled in with a real resume
+ * REQUIRES: server/dev/stage-b-fixture.local.js filled in with a real resume
  * and real canonical requirements (see that file's instructions), and a
  * real OPENAI_API_KEY already configured in server/.env. Makes REAL
  * Stage B API calls — one per run.
@@ -34,7 +34,7 @@ const { evaluateComponents } = require("../services/aiService");
 const { validateComponentEvaluationResponse } = require("../utils/schemaValidator");
 const { rollupRequirements, validateComponentCoverage } = require("../utils/rollup");
 const { calculateMatchScore } = require("../utils/scoring");
-const fixture = require("./stage-b-fixture");
+const fixture = require("./stage-b-fixture.local");
 
 function parseRunCount() {
   const arg = process.argv.find((a) => a.startsWith("--runs="));
@@ -50,7 +50,7 @@ function parseRunCount() {
 
 function assertFixtureIsFilledIn() {
   if (typeof fixture.resumeText !== "string" || fixture.resumeText.includes("<PASTE") || fixture.resumeText.trim().length === 0) {
-    console.error("server/dev/stage-b-fixture.js: resumeText is still a placeholder. Fill it in (see that file's instructions) before running this harness.");
+    console.error("server/dev/stage-b-fixture.local.js: resumeText is still a placeholder. Fill it in (see that file's instructions) before running this harness.");
     process.exit(1);
   }
   if (
@@ -59,7 +59,7 @@ function assertFixtureIsFilledIn() {
     !Array.isArray(fixture.canonicalRequirements.requirements) ||
     fixture.canonicalRequirements.requirements.length === 0
   ) {
-    console.error("server/dev/stage-b-fixture.js: canonicalRequirements is still a placeholder (or malformed). Fill it in (see that file's instructions) before running this harness.");
+    console.error("server/dev/stage-b-fixture.local.js: canonicalRequirements is still a placeholder (or malformed). Fill it in (see that file's instructions) before running this harness.");
     process.exit(1);
   }
 }

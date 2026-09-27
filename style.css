@@ -663,6 +663,76 @@ button { font-family: inherit; cursor: pointer; }
 .confirm-box p { color: var(--ink-soft); font-size: 14px; margin: 0 0 18px; }
 .confirm-box__actions { display: flex; justify-content: flex-end; gap: 10px; }
 
+/* How to Use modal — a centered box like .confirm-box (auto height, not
+   the full-height side .panel), but wide enough for four steps side by
+   side, with .panel__header reused verbatim for its title/close-X. */
+.how-to-use-box {
+  width: min(720px, 92vw);
+  max-height: 85vh;
+  background: var(--surface);
+  border-radius: var(--radius-md);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden; /* header stays put; only .how-to-use__body scrolls if needed */
+}
+
+.how-to-use-box .panel__header {
+  flex-shrink: 0;
+}
+
+.how-to-use__body {
+  padding: 20px;
+  overflow-y: auto;
+}
+
+.how-to-use__steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+}
+
+.how-to-use__step {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 16px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.how-to-use__step-number {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--primary-soft);
+  color: var(--primary);
+  font-family: var(--font-head);
+  font-weight: 700;
+  font-size: 13px;
+}
+
+.how-to-use__step h3 {
+  font-family: var(--font-head);
+  font-size: 14.5px;
+  font-weight: 600;
+  color: var(--ink);
+  margin: 0;
+}
+
+.how-to-use__step p {
+  font-size: 13px;
+  color: var(--ink-soft);
+  margin: 0;
+  line-height: 1.45;
+}
+
 /* =========================================================
    Toast
    ========================================================= */
@@ -689,10 +759,6 @@ button { font-family: inherit; cursor: pointer; }
 /* =========================================================
    AI Job Match (Phase 2)
    ========================================================= */
-#aiMatchStatus {
-  white-space: pre-line;
-}
-
 .ai-match-body {
   margin-top: 24px;
   padding-top: 20px;
@@ -1028,11 +1094,12 @@ button { font-family: inherit; cursor: pointer; }
   .card-list[hidden] { display: none; }
   #detailsOverlay .panel,
   #formOverlay .panel { width: 100%; }
+  .how-to-use__steps { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 520px) {
-  .app-header__actions { width: 100%; }
-  .app-header__actions .btn { flex: 1; }
+  .app-header__actions { width: 100%; flex-wrap: wrap; }
+  .app-header__actions .btn { flex: 1 1 auto; min-width: 100px; }
   .field-row { grid-template-columns: 1fr; }
   .detail-grid { grid-template-columns: 1fr; }
   .summary { grid-template-columns: 1fr 1fr; }
