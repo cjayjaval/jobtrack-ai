@@ -32,7 +32,7 @@ const RESUME_STORAGE_KEY = "jobtrackai_resume";
 // wiring) — NOT the OpenAI model version, which is configured server-side.
 // Bump this if the analysis pipeline itself changes in a way that means
 // an old saved result should no longer be treated as current.
-const ANALYSIS_VERSION = "0.3.0";
+const ANALYSIS_VERSION = "0.3.1";
 
 const MAX_RESUME_FILE_SIZE = 5 * 1024 * 1024; // 5 MB — generous for a text-based PDF resume
 // Keep in sync with server/utils/limits.js — enforced again server-side regardless.
@@ -390,9 +390,14 @@ function computeAnalysisStatus(app, resume) {
   // current-format data we know something changed, but stacking
   // separate sentences ("...recommended. ...recommended.") reads as
   // repetitive without adding useful information over this single line.
+  const onlyVersionChanged = versionChanged && !jobSideChanged && !resumeChanged;
   const staleReasons = isCurrent
     ? []
-    : ["Job requirements or resume have changed since the last analysis. Re-analysis recommended."];
+    : [
+        onlyVersionChanged
+          ? "This analysis was generated using an earlier version of JobTrack AI. Re-analysis recommended."
+          : "Job requirements or resume have changed since the last analysis. Re-analysis recommended.",
+      ];
 
   return { hasAnalysis: true, isCurrent, isLegacy: false, staleReasons };
 }
@@ -723,6 +728,13 @@ async function handleAnalyzeClick(app) {
     // a stale list.
     const cachedCanonicalRequirements = app.aiAnalysis && app.aiAnalysis.canonicalRequirements ? app.aiAnalysis.canonicalRequirements : null;
     const cachedFingerprint = app.aiAnalysis && app.aiAnalysis.analyzedCanonicalRequirementsFingerprint ? app.aiAnalysis.analyzedCanonicalRequirementsFingerprint : null;
+    // A canonical list saved by an older pipeline version must not be
+    // reused even if the job-side fingerprint still matches — the
+    // fingerprint only proves the job INPUTS are unchanged, not that the
+    // Stage A logic that produced the list is still current. When the
+    // saved version is missing or differs, omit the cache fields so the
+    // backend runs Stage A fresh.
+    const cachedAnalysisIsCurrentVersion = !!(app.aiAnalysis && app.aiAnalysis.analysisVersion === ANALYSIS_VERSION);
 
     const requestBody = {
       resumeText: resume.text,
@@ -732,7 +744,7 @@ async function handleAnalyzeClick(app) {
       niceToHaveSkills: app.niceToHaveSkills || [],
       niceToHaveSkillsOther: app.niceToHaveSkillsOther || "",
     };
-    if (cachedCanonicalRequirements && cachedFingerprint) {
+    if (cachedCanonicalRequirements && cachedFingerprint && cachedAnalysisIsCurrentVersion) {
       requestBody.canonicalRequirements = cachedCanonicalRequirements;
       requestBody.canonicalRequirementsFingerprint = cachedFingerprint;
     }
