@@ -327,21 +327,119 @@ button { font-family: inherit; cursor: pointer; }
   padding: 10px 10px;
   line-height: 1.5;
 }
-.ledger td.cell-ai-summary .ai-match__breakdown-points,
 .ledger td.cell-ai-summary .ai-match__breakdown-pct,
 .ledger td.cell-ai-summary .cell-ai-pending {
   display: block;
 }
-/* Always render the (possibly empty) points line before the percentage
-   — see aiMatchSummaryHtml() in script.js — so the percentage itself
-   lands on the same vertical position whether or not a points line has
-   actual text, instead of Overall Match's single-line percentage
-   sitting higher than Core/Nice-to-Have's two-line version. */
+/* The small, muted placeholder for an application with no saved analysis
+   (see overallMatchHtml() in script.js) — nowrap so it doesn't break
+   one word per line in a narrow column. */
 .cell-ai-pending {
   font-size: 11px;
   color: var(--ink-faint);
   white-space: nowrap;
 }
+
+/* Header label + its info icon stay on one line. */
+.ledger__match-col { white-space: nowrap; }
+
+.info-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  margin-left: 4px;
+  padding: 0;
+  vertical-align: middle;
+  border: 1px solid var(--border-strong);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--ink-faint);
+  font-family: var(--font-head);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: help;
+}
+.info-icon:hover { color: var(--primary); border-color: var(--primary); }
+.info-icon:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+
+/* The Overall Match percentage, when it has a Core/Nice-to-Have breakdown
+   behind it. A real <button> so it is keyboard-focusable and tappable. */
+.match-trigger {
+  display: inline-flex;
+  align-items: baseline;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.match-trigger .ai-match__breakdown-pct {
+  text-decoration: underline dotted var(--ink-faint);
+  text-underline-offset: 4px;
+}
+.match-trigger:hover .ai-match__breakdown-pct { color: var(--primary-dark); }
+.match-trigger:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 3px;
+  border-radius: var(--radius-sm);
+}
+
+/* One shared popover, fixed-positioned by script.js so the table's
+   overflow-x:auto can't clip it. pointer-events:none so it never gets
+   in the way of (or steals hover from) what's underneath. */
+.match-popover {
+  position: fixed;
+  z-index: 60;
+  min-width: 170px;
+  max-width: 260px;
+  padding: 12px 14px;
+  background: var(--surface);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  box-shadow: 0 8px 24px rgba(28, 36, 48, 0.18);
+  font-size: 12.5px;
+  color: var(--ink);
+  pointer-events: none;
+}
+/* Without this, .match-popover's own display rules would beat the
+   browser's built-in [hidden] — same root cause as the .overlay[hidden]
+   and .other-detail-field[hidden] fixes elsewhere in this file. */
+.match-popover[hidden] { display: none; }
+.match-popover__section + .match-popover__section {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+.match-popover__label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--ink-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+.match-popover__points { font-size: 12px; color: var(--ink-soft); margin-top: 2px; }
+.match-popover__pct {
+  font-family: var(--font-head);
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--primary);
+}
+.match-popover__text { line-height: 1.45; color: var(--ink-soft); }
+
+/* Date applied + time inputs share one field; they wrap instead of
+   overflowing in the half-width column. */
+.date-time-group { display: flex; flex-wrap: wrap; gap: 8px; }
+.date-time-group input[type="date"] { flex: 1 1 140px; min-width: 0; }
+.date-time-group input[type="time"] { flex: 1 1 110px; min-width: 0; }
+
+/* Time shown under/after the date; never includes seconds. */
+.date-applied__time { margin-left: 6px; color: var(--ink-faint); }
+.ledger .date-applied__time { display: block; margin-left: 0; font-size: 12px; }
 
 .ledger__actions-col { text-align: right; }
 .ledger td.cell-actions { text-align: right; white-space: nowrap; }
@@ -411,21 +509,31 @@ button { font-family: inherit; cursor: pointer; }
 }
 
 .app-card__ai-summary {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
   gap: 10px;
   padding: 10px;
   background: var(--bg);
   border-radius: var(--radius-sm);
   margin-bottom: 10px;
 }
-.app-card__ai-item { display: flex; flex-direction: column; gap: 2px; }
 .app-card__ai-label {
   font-size: 10.5px;
   font-weight: 600;
   color: var(--ink-faint);
   text-transform: uppercase;
   letter-spacing: 0.02em;
+}
+/* Touch screens have no hover, so say how to reach the breakdown. This
+   lives on the trigger itself, so it only appears when there IS a
+   breakdown to reach. */
+.app-card__ai-summary .match-trigger::after {
+  content: "Tap for breakdown";
+  margin-left: 8px;
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--ink-faint);
 }
 
 .app-card__actions { display: flex; gap: 6px; }

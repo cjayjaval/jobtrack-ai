@@ -255,6 +255,12 @@ const els = {
 let currentDetailsId = null;
 let pendingDeleteId = null;
 
+// Set when the Add Application modal opens (null while editing). The visible
+// Date applied / time defaults come from this moment, and its SECONDS are
+// kept here — never shown in the UI — to build the stored
+// dateAppliedTimestamp when the new application is saved.
+let newApplicationOpenedAt = null;
+
 /* ---------------------------------------------------------
    3. INITIAL SETUP (runs once on page load)
    --------------------------------------------------------- */
@@ -408,6 +414,7 @@ function renderSummary() {
 
 /** Applies search + filters + sort, then draws the table and card list. */
 function renderList() {
+  hidePopover();
   const visible = getFilteredAndSortedApplications();
 
   const hasAnyApplications = applications.length > 0;
@@ -450,49 +457,124 @@ function getFilteredAndSortedApplications() {
     return matchesQuery && matchesStatus && matchesSource;
   });
 
+  // Original array position, used only as the very last tie-breaker.
+  const originalIndex = new Map(applications.map((app, i) => [app, i]));
+
   result.sort((a, b) => {
-    const diff = new Date(a.dateApplied) - new Date(b.dateApplied);
-    return sortValue === "date-asc" ? diff : -diff;
+    const cmp = compareByDateApplied(a, b, originalIndex);
+    return sortValue === "date-asc" ? cmp : -cmp;
   });
 
   return result;
 }
 
+function compareNumbers(x, y) {
+  return x < y ? -1 : x > y ? 1 : 0;
+}
+
 /**
- * Builds the Overall Match / Core Qualifications / Nice-to-Have display
- * values purely from the application's already-saved app.aiAnalysis —
- * this never recalculates anything (Model D scoring stays entirely in
- * server/utils/scoring.js) and never makes a request. An application
- * with no saved analysis, or an old/malformed one missing matchScore,
- * shows "Not analyzed yet" rather than guessing.
+ * Ascending Date-applied order. Descending ("newest") is simply the exact
+ * reverse, so oldest-first is a true mirror of newest-first, tie-breaks
+ * included. Comparison keys, in order:
+ *
+ *  1. dateApplied (calendar date)
+ *  2. instant within that date:
+ *       - the full dateAppliedTimestamp (including hidden seconds) when the
+ *         record has genuine time information
+ *       - otherwise — legacy date-only records, whose real time is unknown
+ *         and is NOT invented — the record's createdAt, as a deterministic
+ *         "when was it added" fallback (no createdAt => earliest)
+ *  3. createdAt
+ *  4. Application ID number (sequential, never reused)
+ *  5. original array position
+ *
+ * Using one consistent key per record (rather than special-casing pairs of
+ * timestamped vs date-only records) keeps this a valid total order, so the
+ * sort result is always deterministic.
  */
-function aiMatchSummaryHtml(app) {
+function compareByDateApplied(a, b, originalIndex) {
+  const dateA = a.dateApplied || "";
+  const dateB = b.dateApplied || "";
+  if (dateA !== dateB) return dateA < dateB ? -1 : 1;
+
+  const createdA = Date.parse(a.createdAt);
+  const createdB = Date.parse(b.createdAt);
+  const createdKeyA = isNaN(createdA) ? -Infinity : createdA;
+  const createdKeyB = isNaN(createdB) ? -Infinity : createdB;
+
+  const tsA = parseDateAppliedTimestamp(a.dateAppliedTimestamp);
+  const tsB = parseDateAppliedTimestamp(b.dateAppliedTimestamp);
+  const instantA = tsA ? tsA.ms : createdKeyA;
+  const instantB = tsB ? tsB.ms : createdKeyB;
+
+  return (
+    compareNumbers(instantA, instantB) ||
+    compareNumbers(createdKeyA, createdKeyB) ||
+    compareNumbers(appNumberValue(a), appNumberValue(b)) ||
+    compareNumbers(originalIndex.get(a), originalIndex.get(b))
+  );
+}
+
+/** Numeric part of "APP-0012" (12); -Infinity when absent so such records sort earliest among ties. */
+function appNumberValue(app) {
+  const n = parseInt(String(app.appNumber || "").replace(/\D/g, ""), 10);
+  return isNaN(n) ? -Infinity : n;
+}
+
+/**
+ * Builds the Overall Match display for an application purely from its
+ * already-saved app.aiAnalysis — it never recalculates anything (Model D
+ * scoring stays entirely in server/utils/scoring.js) and never makes a
+ * request. An application with no saved analysis, or an old/malformed one
+ * missing matchScore, shows "Not analyzed yet" rather than guessing.
+ *
+ * Core Qualifications / Nice-to-Have are no longer their own columns; they
+ * are reached from the percentage itself (shared popover, below). The
+ * percentage only becomes an interactive trigger when there is real tier
+ * data to show — otherwise it is plain text, never a button that leads to
+ * an empty or invented breakdown.
+ */
+function overallMatchHtml(app) {
   const analysis = app.aiAnalysis;
-  // An empty points-line placeholder is rendered in every branch below
-  // (not just when there's real "x / y points" text) so the percentage
-  // that follows always sits at the same vertical position across
-  // Overall Match, Core Qualifications, and Nice-to-Have — regardless
-  // of which of them actually has supporting points text to show.
-  const emptyPointsLine = `<span class="ai-match__breakdown-points"></span>`;
-
   if (!analysis || typeof analysis.matchScore !== "number") {
-    const notAnalyzed = `${emptyPointsLine}<span class="cell-ai-pending">Not analyzed yet</span>`;
-    return { overall: notAnalyzed, core: notAnalyzed, nth: notAnalyzed };
+    return `<span class="cell-ai-pending">Not analyzed yet</span>`;
   }
+  const pct = `${analysis.matchScore.toFixed(2)}%`;
+  if (!isUsableTier(analysis.core) && !isUsableTier(analysis.nth)) {
+    return `<span class="ai-match__breakdown-pct">${pct}</span>`;
+  }
+  return (
+    `<button type="button" class="match-trigger" data-popover="match" data-app-id="${escapeHtml(app.id)}" ` +
+    `aria-expanded="false" aria-label="Overall Match ${pct}. Show Core Qualifications and Nice-to-Have breakdown">` +
+    `<span class="ai-match__breakdown-pct">${pct}</span></button>`
+  );
+}
 
-  const overall = `${emptyPointsLine}<span class="ai-match__breakdown-pct">${analysis.matchScore.toFixed(2)}%</span>`;
+/** A saved Core/Nice-to-Have tier is only shown as numbers when it has applicable requirements and a stored percentage. */
+function isUsableTier(tier) {
+  return !!tier && typeof tier.count === "number" && tier.count > 0 && typeof tier.coveragePercent === "number";
+}
 
-  function tierHtml(tier) {
-    if (!tier || typeof tier.count !== "number" || tier.count === 0 || typeof tier.coveragePercent !== "number") {
-      return `${emptyPointsLine}<span class="cell-muted">—</span>`;
+/** Popover body for one application: saved Core + Nice-to-Have values only, with "—" for a tier that has no applicable requirements. */
+function matchPopoverHtml(app) {
+  const analysis = app.aiAnalysis || {};
+  // Whitespace between the blocks is deliberate: they render stacked, but
+  // anything reading the raw text would otherwise run "points" and the
+  // following percentage together.
+  const section = (label, tier) => {
+    if (!isUsableTier(tier)) {
+      return (
+        `<div class="match-popover__section">\n<div class="match-popover__label">${label}</div>\n` +
+        `<div class="match-popover__pct">—</div>\n</div>`
+      );
     }
     return (
-      `<span class="ai-match__breakdown-points">${escapeHtml(String(tier.earnedPoints))} / ${escapeHtml(String(tier.count))} points</span>` +
-      `<span class="ai-match__breakdown-pct">${tier.coveragePercent.toFixed(2)}%</span>`
+      `<div class="match-popover__section">\n<div class="match-popover__label">${label}</div>\n` +
+      `<div class="match-popover__points">${escapeHtml(String(tier.earnedPoints))} / ${escapeHtml(String(tier.count))} points</div>\n` +
+      `<div class="match-popover__pct">${tier.coveragePercent.toFixed(2)}%</div>\n</div>`
     );
-  }
-
-  return { overall, core: tierHtml(analysis.core), nth: tierHtml(analysis.nth) };
+  };
+  return section("Core Qualifications", analysis.core) + "\n" + section("Nice-to-Have", analysis.nth);
 }
 
 function renderTableRows(list) {
@@ -500,16 +582,20 @@ function renderTableRows(list) {
 
   list.forEach((app) => {
     const tr = document.createElement("tr");
-    const aiCells = aiMatchSummaryHtml(app);
+    // Missing data shows an em dash here (not "Not specified"); Salary offer
+    // uses the same shared formatSalaryDisplay() as the Details panel, which
+    // already treats a blank or whitespace-only amount as empty.
+    const clientBasedText = formatClientBasedDisplay(app.clientBased, app.clientBasedOther);
+    const salaryOfferText = formatSalaryDisplay(app.salaryOfferCurrency, app.salaryOffer);
     tr.innerHTML = `
       <td class="cell-muted">${escapeHtml(app.appNumber || "—")}</td>
-      <td class="cell-ai-summary">${aiCells.overall}</td>
-      <td class="cell-ai-summary">${aiCells.core}</td>
-      <td class="cell-ai-summary">${aiCells.nth}</td>
+      <td class="cell-ai-summary">${overallMatchHtml(app)}</td>
       <td class="cell-title">${escapeHtml(app.jobTitle)}</td>
       <td>${escapeHtml(app.company)}</td>
+      <td class="cell-muted">${escapeHtml(clientBasedText || "—")}</td>
+      <td class="cell-muted">${escapeHtml(salaryOfferText || "—")}</td>
       <td class="cell-muted">${escapeHtml(app.source)}</td>
-      <td class="cell-muted">${formatDate(app.dateApplied)}</td>
+      <td class="cell-muted">${formatDateAppliedHtml(app)}</td>
       <td>${statusPillHtml(app.status)}</td>
       <td class="cell-muted">${escapeHtml(app.workArrangement || "Not specified")}</td>
       <td class="cell-actions"></td>
@@ -529,7 +615,6 @@ function renderCardItems(list) {
   list.forEach((app) => {
     const card = document.createElement("div");
     card.className = "app-card";
-    const aiCells = aiMatchSummaryHtml(app);
     card.innerHTML = `
       <div class="app-card__top">
         <div>
@@ -540,13 +625,12 @@ function renderCardItems(list) {
         ${statusPillHtml(app.status)}
       </div>
       <div class="app-card__ai-summary">
-        <div class="app-card__ai-item"><span class="app-card__ai-label">Overall Match</span>${aiCells.overall}</div>
-        <div class="app-card__ai-item"><span class="app-card__ai-label">Core Qualifications</span>${aiCells.core}</div>
-        <div class="app-card__ai-item"><span class="app-card__ai-label">Nice-to-Have</span>${aiCells.nth}</div>
+        <span class="app-card__ai-label">Overall Match</span>
+        ${overallMatchHtml(app)}
       </div>
       <div class="app-card__meta">
         <span>${escapeHtml(app.source)}</span>
-        <span>${formatDate(app.dateApplied)}</span>
+        <span>${formatDateAppliedHtml(app)}</span>
         <span>${escapeHtml(app.workArrangement || "Not specified")}</span>
       </div>
       <div class="app-card__actions"></div>
@@ -584,7 +668,7 @@ const formFieldIds = [
   "jobTitle", "company", "source", "sourceOther", "dateApplied", "status", "interviewDate",
   "jobUrl", "companyBackground", "jobDescription",
   "requiredSkillsOther", "niceToHaveSkillsOther", "companyBenefits",
-  "clientBased", "clientBasedOther", "workArrangement", "workHours",
+  "clientBased", "clientBasedOther", "workAddress", "workArrangement", "workHours",
   "employmentType", "employmentTypeMonths", "salaryOfferCurrency", "salaryOffer",
   "salaryAskedCurrency", "salaryAsked", "actualSalaryOfferCurrency", "actualSalaryOffer", "notes",
 ];
@@ -605,6 +689,12 @@ function openForm(editId) {
       const el = document.getElementById(field);
       if (el) el.value = app[field] || "";
     });
+    // Time comes from the saved timestamp only. A legacy date-only record
+    // (or one with a malformed timestamp) gets a blank time — we never fill
+    // in the current time or any guessed historical time when Edit opens.
+    newApplicationOpenedAt = null;
+    const savedTimestamp = parseDateAppliedTimestamp(app.dateAppliedTimestamp);
+    document.getElementById("dateAppliedTime").value = savedTimestamp ? savedTimestamp.hhmm : "";
     // Older records saved before the currency dropdown existed won't have
     // a currency value — default those to Peso rather than leaving the
     // select with nothing chosen.
@@ -618,6 +708,11 @@ function openForm(editId) {
     els.formPanelTitle.textContent = "Add application";
     document.getElementById("appId").value = "";
     document.getElementById("appNumberDisplay").value = "";
+    // Default Date applied / time to the moment this modal was opened. The
+    // seconds are captured here (in newApplicationOpenedAt) but never shown.
+    newApplicationOpenedAt = new Date();
+    document.getElementById("dateApplied").value = toLocalDateString(newApplicationOpenedAt);
+    document.getElementById("dateAppliedTime").value = toLocalTimeHHmm(newApplicationOpenedAt);
   }
 
   // Recomputes each grid's disabled state from current checked state —
@@ -629,6 +724,7 @@ function openForm(editId) {
 
   syncOtherField(document.getElementById("source"), document.getElementById("sourceOtherWrap"));
   syncOtherField(document.getElementById("clientBased"), document.getElementById("clientBasedOtherWrap"));
+  syncWorkAddressField();
   syncEmploymentTypeMonthsField();
   syncInterviewDateField();
   syncActualSalaryOfferField();
@@ -640,6 +736,12 @@ function openForm(editId) {
 /** Shows/hides an "Other — please specify" field group based on its select's current value. */
 function syncOtherField(selectEl, wrapperEl) {
   wrapperEl.hidden = selectEl.value !== "Other";
+}
+
+/** Shows/hides the optional Work Address field based on whether Client based is PH. Visibility only — Work Address is never required, even when shown. */
+function syncWorkAddressField() {
+  document.getElementById("workAddressWrap").hidden =
+    document.getElementById("clientBased").value !== "PH";
 }
 
 /** Shows/hides the "number of months" field group based on whether Employment type is Project-based. */
@@ -784,6 +886,7 @@ function handleFormSubmit(event) {
   // rather than silently saving stale, hidden data.
   if (data.source !== "Other") data.sourceOther = "";
   if (data.clientBased !== "Other") data.clientBasedOther = "";
+  if (data.clientBased !== "PH") data.workAddress = "";
   if (data.employmentType !== "Project-based") data.employmentTypeMonths = "";
   if (!INTERVIEW_STATUSES.includes(data.status)) data.interviewDate = "";
   if (data.status !== "Offered") {
@@ -806,6 +909,24 @@ function handleFormSubmit(event) {
   const existingId = document.getElementById("appId").value;
   const now = new Date().toISOString();
 
+  // Date applied timestamp. Visible parts come from the date + time inputs;
+  // the seconds are internal only:
+  //  - new application: the seconds captured when the Add modal opened
+  //  - editing a record that already has a timestamp: its existing seconds
+  //  - editing a legacy record the user is giving a time for the first
+  //    time: :00 (there is no genuine seconds value to preserve)
+  // No time entered => no timestamp: the record stays/becomes date-only.
+  const existingApp = existingId ? applications.find((a) => a.id === existingId) : null;
+  const existingTimestamp = existingApp ? parseDateAppliedTimestamp(existingApp.dateAppliedTimestamp) : null;
+  const timestampSeconds = existingId
+    ? (existingTimestamp ? existingTimestamp.seconds : 0)
+    : (newApplicationOpenedAt ? newApplicationOpenedAt.getSeconds() : 0);
+  const dateAppliedTimestamp = buildDateAppliedTimestamp(
+    data.dateApplied,
+    document.getElementById("dateAppliedTime").value,
+    timestampSeconds
+  );
+
   // For a brand-new application, reserve the next Application ID number now,
   // but don't persist the counter yet — that only happens after a
   // confirmed successful save, so a failed save never burns a number.
@@ -817,13 +938,24 @@ function handleFormSubmit(event) {
   // the user is shown.
   let updatedApplications;
   if (existingId) {
-    updatedApplications = applications.map((a) =>
-      a.id === existingId ? { ...a, ...data, updatedAt: now } : a
-    );
+    updatedApplications = applications.map((a) => {
+      if (a.id !== existingId) return a;
+      const merged = { ...a, ...data, updatedAt: now };
+      if (dateAppliedTimestamp) merged.dateAppliedTimestamp = dateAppliedTimestamp;
+      else delete merged.dateAppliedTimestamp;
+      return merged;
+    });
   } else {
     updatedApplications = [
       ...applications,
-      { id: generateId(), appNumber: formatAppNumber(newAppNumber), ...data, createdAt: now, updatedAt: now },
+      {
+        id: generateId(),
+        appNumber: formatAppNumber(newAppNumber),
+        ...data,
+        ...(dateAppliedTimestamp ? { dateAppliedTimestamp } : {}),
+        createdAt: now,
+        updatedAt: now,
+      },
     ];
   }
 
@@ -864,10 +996,11 @@ function openDetails(id, options) {
       ${detailField("Job title", app.jobTitle)}
       ${detailField("Company", app.company)}
       ${detailField("Source", formatSourceDisplay(app.source, app.sourceOther))}
-      ${detailField("Date applied", formatDate(app.dateApplied))}
+      ${detailField("Date applied", formatDateAppliedHtml(app), true)}
       ${detailField("Status", statusPillHtml(app.status), true)}
       ${app.interviewDate ? detailField("Date of Interview", formatDate(app.interviewDate)) : ""}
       ${detailField("Client based", formatClientBasedDisplay(app.clientBased, app.clientBasedOther))}
+      ${app.clientBased === "PH" ? detailField("Work Address", app.workAddress) : ""}
       ${detailField("Work arrangement", app.workArrangement)}
       ${detailField("Work hours", app.workHours)}
       ${detailField("Employment type", formatEmploymentTypeDisplay(app.employmentType, app.employmentTypeMonths))}
@@ -972,10 +1105,17 @@ function combineSkillsText(skillsArray, otherText) {
   return parts.join(", ");
 }
 
-/** Combines a currency symbol with a salary amount for display, e.g. "₱ 60,000/mo". */
+/**
+ * Combines a currency symbol with a salary amount for display, e.g.
+ * "₱ 60,000/mo". Returns "" when there is no amount — including an amount
+ * that is only whitespace, which would otherwise render as a bare "₱".
+ * Callers decide what to show for "" (Details: "Not specified"; list: "—").
+ */
 function formatSalaryDisplay(currency, amount) {
   if (!amount) return "";
-  return `${currency || "₱"} ${amount}`;
+  const text = typeof amount === "string" ? amount.trim() : String(amount);
+  if (!text) return "";
+  return `${currency || "₱"} ${text}`;
 }
 
 /** Shows the entered detail when Client based is "Other", e.g. "Other: Japan". */
@@ -1101,6 +1241,61 @@ function formatDate(isoDate) {
   return date.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
 }
 
+/* --- Date applied: date + hour + minute, with hidden seconds ----------
+   dateApplied stays exactly what it always was (a "YYYY-MM-DD" string).
+   Records that have genuine time information ALSO carry
+   dateAppliedTimestamp — a LOCAL wall-clock string "YYYY-MM-DDTHH:mm:ss"
+   with no timezone offset, so it always matches the date/hour/minute the
+   user saw and never shifts if their timezone later changes. Legacy
+   date-only records simply don't have the property; no time is invented
+   for them. The seconds are internal only. */
+
+function pad2(n) {
+  return String(n).padStart(2, "0");
+}
+
+/** Local calendar date as "YYYY-MM-DD" (not toISOString(), which is UTC and can land on the wrong day). */
+function toLocalDateString(d) {
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+}
+
+/** Local hour:minute as "HH:mm" — the format <input type="time"> uses. Seconds are deliberately omitted. */
+function toLocalTimeHHmm(d) {
+  return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+}
+
+/**
+ * Parses a stored dateAppliedTimestamp. Returns null for a missing or
+ * malformed value (which then simply behaves like a legacy date-only
+ * record), otherwise { date, hhmm, seconds, ms }.
+ */
+function parseDateAppliedTimestamp(value) {
+  if (typeof value !== "string") return null;
+  const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})$/.exec(value);
+  if (!m) return null;
+  const [, y, mo, d, h, mi, s] = m.map(Number);
+  const dt = new Date(y, mo - 1, d, h, mi, s);
+  if (isNaN(dt.getTime())) return null;
+  return { date: `${m[1]}-${m[2]}-${m[3]}`, hhmm: `${m[4]}:${m[5]}`, seconds: s, ms: dt.getTime() };
+}
+
+/** Builds "YYYY-MM-DDTHH:mm:ss" from the visible date + "HH:mm" time and the internal seconds, or "" if either visible part is missing/invalid. */
+function buildDateAppliedTimestamp(dateStr, timeStr, seconds) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr || "")) return "";
+  const t = /^(\d{2}):(\d{2})/.exec(timeStr || "");
+  if (!t) return "";
+  return `${dateStr}T${t[1]}:${t[2]}:${pad2(seconds || 0)}`;
+}
+
+/** "Oct 1, 2026" plus, when the record has genuine time info, a separate "6:52 PM" part. Never includes seconds. */
+function formatDateAppliedHtml(app) {
+  const dateText = escapeHtml(formatDate(app.dateApplied));
+  const ts = parseDateAppliedTimestamp(app.dateAppliedTimestamp);
+  if (!ts) return dateText;
+  const timeText = new Date(ts.ms).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  return `${dateText}<span class="date-applied__time">${escapeHtml(timeText)}</span>`;
+}
+
 // Prevents any saved text (job titles, notes, etc.) from being treated
 // as HTML when we insert it into the page — keeps the app safe from
 // broken markup, and from HTML/attribute injection via saved values
@@ -1128,6 +1323,128 @@ function showToast(message, isSuccess) {
 /* ---------------------------------------------------------
    10. EVENT LISTENERS
    --------------------------------------------------------- */
+
+/* ---------------------------------------------------------
+   Shared tooltip / popover
+   Used by the Overall Match percentage (Core Qualifications +
+   Nice-to-Have breakdown) and the Overall Match header info icon.
+   One fixed-position element appended to <body> rather than a
+   child of each table cell: .table-wrap has overflow-x:auto, which
+   would clip an absolutely positioned popover (and make the last
+   rows' popovers unreachable). Content for a match trigger is built
+   on demand from the application's SAVED aiAnalysis — no
+   recalculation and no request.
+   --------------------------------------------------------- */
+
+let activePopoverTrigger = null;
+
+function getPopoverEl() {
+  let el = document.getElementById("matchPopover");
+  if (!el) {
+    el = document.createElement("div");
+    el.id = "matchPopover";
+    el.className = "match-popover";
+    el.setAttribute("role", "tooltip");
+    el.hidden = true;
+    document.body.appendChild(el);
+  }
+  return el;
+}
+
+/** HTML for a trigger's popover, or null if there is nothing to show (e.g. the application no longer exists). */
+function popoverContentFor(trigger) {
+  if (trigger.dataset.popover === "info") {
+    return `<div class="match-popover__text">${escapeHtml(trigger.dataset.popoverText || "")}</div>`;
+  }
+  if (trigger.dataset.popover === "match") {
+    const app = applications.find((a) => a.id === trigger.dataset.appId);
+    return app ? matchPopoverHtml(app) : null;
+  }
+  return null;
+}
+
+function showPopover(trigger) {
+  if (activePopoverTrigger === trigger) return;
+  const html = popoverContentFor(trigger);
+  if (!html) return;
+  hidePopover();
+  const el = getPopoverEl();
+  el.innerHTML = html;
+  el.hidden = false;
+  el.style.visibility = "hidden"; // measure first, then reveal, so it never flashes in the wrong spot
+  positionPopover(trigger, el);
+  el.style.visibility = "";
+  trigger.setAttribute("aria-describedby", "matchPopover");
+  if (trigger.dataset.popover === "match") trigger.setAttribute("aria-expanded", "true");
+  activePopoverTrigger = trigger;
+}
+
+function hidePopover() {
+  const el = document.getElementById("matchPopover");
+  if (el) el.hidden = true;
+  if (activePopoverTrigger) {
+    activePopoverTrigger.removeAttribute("aria-describedby");
+    if (activePopoverTrigger.dataset.popover === "match") activePopoverTrigger.setAttribute("aria-expanded", "false");
+  }
+  activePopoverTrigger = null;
+}
+
+/** Below the trigger by default; flips above if there isn't room; clamped to stay inside the viewport horizontally. */
+function positionPopover(trigger, el) {
+  const gap = 8;
+  const margin = 8;
+  const t = trigger.getBoundingClientRect();
+  const w = el.offsetWidth;
+  const h = el.offsetHeight;
+  let top = t.bottom + gap;
+  if (top + h > window.innerHeight - margin && t.top - gap - h >= margin) top = t.top - gap - h;
+  let left = t.left + t.width / 2 - w / 2;
+  left = Math.max(margin, Math.min(left, window.innerWidth - w - margin));
+  el.style.top = `${Math.round(top)}px`;
+  el.style.left = `${Math.round(left)}px`;
+}
+
+/**
+ * Delegated listeners (the triggers are re-created on every list render).
+ * Hover and keyboard focus open it; a click/tap also opens it, which is
+ * what makes it reachable on touch screens where there is no hover.
+ * It closes on mouse-out, blur, Escape, scrolling/resizing, or any
+ * click/tap elsewhere. Tapping the trigger never toggles it closed —
+ * on touch, the emulated hover + focus + click all fire for one tap, and
+ * a toggle would immediately undo itself.
+ */
+function attachMatchPopoverListeners() {
+  const triggerFrom = (event) => (event.target && event.target.closest ? event.target.closest("[data-popover]") : null);
+
+  document.addEventListener("mouseover", (event) => {
+    const t = triggerFrom(event);
+    if (t) showPopover(t);
+  });
+  document.addEventListener("mouseout", (event) => {
+    const t = triggerFrom(event);
+    if (t && !t.contains(event.relatedTarget)) hidePopover();
+  });
+  document.addEventListener("focusin", (event) => {
+    const t = triggerFrom(event);
+    if (t) showPopover(t);
+  });
+  document.addEventListener("focusout", (event) => {
+    const t = triggerFrom(event);
+    if (t && !t.contains(event.relatedTarget)) hidePopover();
+  });
+  document.addEventListener("click", (event) => {
+    const t = triggerFrom(event);
+    if (t) showPopover(t);
+    else hidePopover();
+  });
+  document.addEventListener("keydown", (event) => {
+    if (event.key === "Escape" && activePopoverTrigger) hidePopover();
+  });
+  // Its position is computed once from the trigger, so close it rather
+  // than let it drift away from the trigger on scroll/resize.
+  window.addEventListener("scroll", hidePopover, true);
+  window.addEventListener("resize", hidePopover);
+}
 
 function attachEventListeners() {
   // Open add form
@@ -1160,6 +1477,7 @@ function attachEventListeners() {
   });
   document.getElementById("clientBased").addEventListener("change", () => {
     syncOtherField(document.getElementById("clientBased"), document.getElementById("clientBasedOtherWrap"));
+    syncWorkAddressField();
     clearFieldErrorIfNowValid("clientBasedOther");
   });
   document.getElementById("employmentType").addEventListener("change", () => {
@@ -1245,6 +1563,8 @@ function attachEventListeners() {
     else if (!els.deleteOverlay.hidden) closeDeleteConfirm();
     else if (!els.howToUseOverlay.hidden) closeHowToUse();
   });
+
+  attachMatchPopoverListeners();
 }
 
 /* ---------------------------------------------------------

@@ -248,7 +248,23 @@ function computeResumeFingerprint(resumeText) {
 function persistAiAnalysis(appId, aiAnalysis) {
   const updated = applications.map((a) => (a.id === appId ? { ...a, aiAnalysis } : a));
   const saved = saveApplications(updated);
-  if (saved) applications = updated;
+  if (saved) {
+    applications = updated;
+    // The Application List (Overall Match column and its Core/Nice-to-Have
+    // breakdown popover) is built from `applications`, and nothing else
+    // re-renders it after an analysis — so refresh it from the data that
+    // was just saved. renderList() reads the live search / filter / sort
+    // controls each time, so the user's current view is preserved. This
+    // only re-renders saved data: no request, no recalculation. It sits in
+    // its own try/catch because the analysis is already saved at this
+    // point — a rendering error here must not be reported by
+    // handleAnalyzeClick's catch as if the analysis itself had failed.
+    try {
+      if (typeof renderList === "function") renderList();
+    } catch (err) {
+      console.error("Could not refresh the application list after analysis:", err);
+    }
+  }
   return saved;
 }
 
