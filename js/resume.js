@@ -300,7 +300,7 @@ function renderAiJobMatchSection(app) {
     <p class="form-msg" id="resumeUploadStatus" role="status"></p>
 
     ${hasJobSide
-      ? `<p class="form-msg" id="aiMatchStatus" role="status"></p><div id="aiMatchResultsWrap"></div>`
+      ? `<div id="aiMatchResultsWrap"></div>`
       : `<p class="ai-match__notice">This application doesn't have a job description or any listed skills to analyze yet — add one by editing the application.</p>`
     }
   `;
@@ -328,6 +328,14 @@ function renderAiJobMatchSection(app) {
 
   if (hasJobSide) {
     renderAnalyzeControlsAndResults(document.getElementById("aiMatchResultsWrap"), app);
+  } else {
+    // Nothing to analyze for this application — the fixed status area
+    // and the footer's Analyze slot (see index.html) must not keep
+    // showing content left over from a previously-viewed application.
+    const fixedStatusContainer = document.getElementById("aiMatchFixedStatus");
+    const analyzeSlot = document.getElementById("analyzeActionSlot");
+    if (fixedStatusContainer) fixedStatusContainer.innerHTML = "";
+    if (analyzeSlot) analyzeSlot.innerHTML = "";
   }
 
   // Content height may have just changed (results appeared/changed, or
@@ -414,23 +422,44 @@ function renderAnalyzeControlsAndResults(container, app) {
     noticeHtml = `<p class="ai-match__stale-notice">${status.staleReasons.map(escapeHtml).join(" ")}</p>`;
   }
 
+  // Results-only content stays in the scrollable area (container is
+  // #aiMatchResultsWrap, inside #aiMatchBody/#detailsScrollArea).
   container.innerHTML = `
     <div id="aiMatchContentArea">
       ${analysis ? renderAnalysisResultsHtml(analysis) : ""}
-      ${noticeHtml}
     </div>
-    <button type="button" class="btn btn--primary${status.isCurrent ? " btn--current-disabled" : ""}" id="analyzeActionBtn"${status.isCurrent ? " disabled" : ""}>
-      <span class="ai-match__btn-icon" id="analyzeActionIcon" aria-hidden="true"></span>
-      <span id="analyzeActionText">${analysis ? "Re-analyze Job Match" : "Analyze Job Match"}</span>
-    </button>
   `;
 
-  // A genuinely `disabled` button never dispatches click events from user
-  // interaction — that's what actually prevents an API request while the
-  // analysis is current, not extra guard logic in the handler.
-  document.getElementById("analyzeActionBtn").addEventListener("click", () => {
-    handleAnalyzeClick(app);
-  });
+  // The freshness/error status and the Analyze/Re-analyze button both
+  // live OUTSIDE the scrollable area now — #aiMatchFixedStatus (above
+  // the footer) and #analyzeActionSlot (inside .panel__footer, see
+  // index.html) — so they stay visible while long results scroll.
+  // #aiMatchStatus keeps the exact same id it always had; showAiMatchError()/
+  // clearAiMatchError() look it up by id and need no changes themselves.
+  const fixedStatusContainer = document.getElementById("aiMatchFixedStatus");
+  if (fixedStatusContainer) {
+    fixedStatusContainer.innerHTML = `
+      <p class="form-msg" id="aiMatchStatus" role="status"></p>
+      ${noticeHtml}
+    `;
+  }
+
+  const analyzeSlot = document.getElementById("analyzeActionSlot");
+  if (analyzeSlot) {
+    analyzeSlot.innerHTML = `
+      <button type="button" class="btn btn--primary${status.isCurrent ? " btn--current-disabled" : ""}" id="analyzeActionBtn"${status.isCurrent ? " disabled" : ""}>
+        <span class="ai-match__btn-icon" id="analyzeActionIcon" aria-hidden="true"></span>
+        <span id="analyzeActionText">${analysis ? "Re-analyze Job Match" : "Analyze Job Match"}</span>
+      </button>
+    `;
+
+    // A genuinely `disabled` button never dispatches click events from
+    // user interaction — that's what actually prevents an API request
+    // while the analysis is current, not extra guard logic in the handler.
+    document.getElementById("analyzeActionBtn").addEventListener("click", () => {
+      handleAnalyzeClick(app);
+    });
+  }
 }
 
 /** Builds the results markup as a string — every AI-generated field is escaped. */

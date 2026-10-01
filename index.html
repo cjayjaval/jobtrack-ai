@@ -102,6 +102,9 @@
           <thead>
             <tr>
               <th>Application ID</th>
+              <th>Overall Match</th>
+              <th>Core Qualifications</th>
+              <th>Nice-to-Have</th>
               <th>Job title</th>
               <th>Company</th>
               <th>Source</th>
@@ -292,6 +295,11 @@
           </div>
 
           <div class="field">
+            <label for="workHours">Work hours <span class="form-section__hint">(optional)</span></label>
+            <input type="text" id="workHours" placeholder="e.g. 9:00 AM – 6:00 PM, Night Shift, Flexible">
+          </div>
+
+          <div class="field">
             <label for="employmentType">Employment type</label>
             <select id="employmentType">
               <option value="">Not specified</option>
@@ -362,9 +370,17 @@
         </div>
       </div>
       <button type="button" class="go-to-top-btn" id="detailsGoToTopBtn" aria-label="Go to top" title="Go to top" hidden>↑</button>
-      <div class="panel__footer">
-        <button type="button" class="btn btn--text" id="detailsEditBtn">Edit</button>
-        <button type="button" class="btn btn--primary" id="detailsCloseBtn">Close</button>
+      <div class="panel__fixed-status" id="aiMatchFixedStatus">
+        <!-- injected by js/resume.js: current/stale/legacy/error analysis status -->
+      </div>
+      <div class="panel__footer panel__footer--split">
+        <div class="panel__footer-analyze" id="analyzeActionSlot">
+          <!-- injected by js/resume.js: Analyze/Re-analyze Job Match button -->
+        </div>
+        <div class="panel__footer-right">
+          <button type="button" class="btn btn--text" id="detailsEditBtn">Edit</button>
+          <button type="button" class="btn btn--primary" id="detailsCloseBtn">Close</button>
+        </div>
       </div>
     </div>
   </div>

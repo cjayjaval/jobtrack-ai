@@ -458,13 +458,54 @@ function getFilteredAndSortedApplications() {
   return result;
 }
 
+/**
+ * Builds the Overall Match / Core Qualifications / Nice-to-Have display
+ * values purely from the application's already-saved app.aiAnalysis —
+ * this never recalculates anything (Model D scoring stays entirely in
+ * server/utils/scoring.js) and never makes a request. An application
+ * with no saved analysis, or an old/malformed one missing matchScore,
+ * shows "Not analyzed yet" rather than guessing.
+ */
+function aiMatchSummaryHtml(app) {
+  const analysis = app.aiAnalysis;
+  // An empty points-line placeholder is rendered in every branch below
+  // (not just when there's real "x / y points" text) so the percentage
+  // that follows always sits at the same vertical position across
+  // Overall Match, Core Qualifications, and Nice-to-Have — regardless
+  // of which of them actually has supporting points text to show.
+  const emptyPointsLine = `<span class="ai-match__breakdown-points"></span>`;
+
+  if (!analysis || typeof analysis.matchScore !== "number") {
+    const notAnalyzed = `${emptyPointsLine}<span class="cell-ai-pending">Not analyzed yet</span>`;
+    return { overall: notAnalyzed, core: notAnalyzed, nth: notAnalyzed };
+  }
+
+  const overall = `${emptyPointsLine}<span class="ai-match__breakdown-pct">${analysis.matchScore.toFixed(2)}%</span>`;
+
+  function tierHtml(tier) {
+    if (!tier || typeof tier.count !== "number" || tier.count === 0 || typeof tier.coveragePercent !== "number") {
+      return `${emptyPointsLine}<span class="cell-muted">—</span>`;
+    }
+    return (
+      `<span class="ai-match__breakdown-points">${escapeHtml(String(tier.earnedPoints))} / ${escapeHtml(String(tier.count))} points</span>` +
+      `<span class="ai-match__breakdown-pct">${tier.coveragePercent.toFixed(2)}%</span>`
+    );
+  }
+
+  return { overall, core: tierHtml(analysis.core), nth: tierHtml(analysis.nth) };
+}
+
 function renderTableRows(list) {
   els.ledgerBody.innerHTML = "";
 
   list.forEach((app) => {
     const tr = document.createElement("tr");
+    const aiCells = aiMatchSummaryHtml(app);
     tr.innerHTML = `
       <td class="cell-muted">${escapeHtml(app.appNumber || "—")}</td>
+      <td class="cell-ai-summary">${aiCells.overall}</td>
+      <td class="cell-ai-summary">${aiCells.core}</td>
+      <td class="cell-ai-summary">${aiCells.nth}</td>
       <td class="cell-title">${escapeHtml(app.jobTitle)}</td>
       <td>${escapeHtml(app.company)}</td>
       <td class="cell-muted">${escapeHtml(app.source)}</td>
@@ -474,9 +515,10 @@ function renderTableRows(list) {
       <td class="cell-actions"></td>
     `;
     const actionsCell = tr.querySelector(".cell-actions");
-    actionsCell.appendChild(makeRowActionButton("Analyze", () => openDetails(app.id, { scrollToAnalysis: true })));
-    actionsCell.appendChild(makeRowActionButton("Edit", () => openForm(app.id)));
-    actionsCell.appendChild(makeRowActionButton("Delete", () => openDeleteConfirm(app.id), true));
+    const analyzeLabel = app.aiAnalysis ? "View Job Match" : "Analyze Job Match";
+    actionsCell.appendChild(makeRowActionButton("🔍", analyzeLabel, () => openDetails(app.id, { scrollToAnalysis: true })));
+    actionsCell.appendChild(makeRowActionButton("✏️", "Edit Application", () => openForm(app.id)));
+    actionsCell.appendChild(makeRowActionButton("🗑️", "Delete Application", () => openDeleteConfirm(app.id), true));
     els.ledgerBody.appendChild(tr);
   });
 }
@@ -487,6 +529,7 @@ function renderCardItems(list) {
   list.forEach((app) => {
     const card = document.createElement("div");
     card.className = "app-card";
+    const aiCells = aiMatchSummaryHtml(app);
     card.innerHTML = `
       <div class="app-card__top">
         <div>
@@ -496,6 +539,11 @@ function renderCardItems(list) {
         </div>
         ${statusPillHtml(app.status)}
       </div>
+      <div class="app-card__ai-summary">
+        <div class="app-card__ai-item"><span class="app-card__ai-label">Overall Match</span>${aiCells.overall}</div>
+        <div class="app-card__ai-item"><span class="app-card__ai-label">Core Qualifications</span>${aiCells.core}</div>
+        <div class="app-card__ai-item"><span class="app-card__ai-label">Nice-to-Have</span>${aiCells.nth}</div>
+      </div>
       <div class="app-card__meta">
         <span>${escapeHtml(app.source)}</span>
         <span>${formatDate(app.dateApplied)}</span>
@@ -504,18 +552,21 @@ function renderCardItems(list) {
       <div class="app-card__actions"></div>
     `;
     const actionsCell = card.querySelector(".app-card__actions");
-    actionsCell.appendChild(makeRowActionButton("Analyze", () => openDetails(app.id, { scrollToAnalysis: true })));
-    actionsCell.appendChild(makeRowActionButton("Edit", () => openForm(app.id)));
-    actionsCell.appendChild(makeRowActionButton("Delete", () => openDeleteConfirm(app.id), true));
+    const analyzeLabel = app.aiAnalysis ? "View Job Match" : "Analyze Job Match";
+    actionsCell.appendChild(makeRowActionButton("🔍", analyzeLabel, () => openDetails(app.id, { scrollToAnalysis: true })));
+    actionsCell.appendChild(makeRowActionButton("✏️", "Edit Application", () => openForm(app.id)));
+    actionsCell.appendChild(makeRowActionButton("🗑️", "Delete Application", () => openDeleteConfirm(app.id), true));
     els.cardList.appendChild(card);
   });
 }
 
-function makeRowActionButton(label, onClick, isDanger) {
+function makeRowActionButton(icon, accessibleLabel, onClick, isDanger) {
   const btn = document.createElement("button");
   btn.type = "button";
   btn.className = "row-action" + (isDanger ? " row-action--danger" : "");
-  btn.textContent = label;
+  btn.innerHTML = `<span aria-hidden="true">${icon}</span>`;
+  btn.setAttribute("aria-label", accessibleLabel);
+  btn.title = accessibleLabel;
   btn.addEventListener("click", onClick);
   return btn;
 }
@@ -533,7 +584,7 @@ const formFieldIds = [
   "jobTitle", "company", "source", "sourceOther", "dateApplied", "status", "interviewDate",
   "jobUrl", "companyBackground", "jobDescription",
   "requiredSkillsOther", "niceToHaveSkillsOther", "companyBenefits",
-  "clientBased", "clientBasedOther", "workArrangement",
+  "clientBased", "clientBasedOther", "workArrangement", "workHours",
   "employmentType", "employmentTypeMonths", "salaryOfferCurrency", "salaryOffer",
   "salaryAskedCurrency", "salaryAsked", "actualSalaryOfferCurrency", "actualSalaryOffer", "notes",
 ];
@@ -818,6 +869,7 @@ function openDetails(id, options) {
       ${app.interviewDate ? detailField("Date of Interview", formatDate(app.interviewDate)) : ""}
       ${detailField("Client based", formatClientBasedDisplay(app.clientBased, app.clientBasedOther))}
       ${detailField("Work arrangement", app.workArrangement)}
+      ${detailField("Work hours", app.workHours)}
       ${detailField("Employment type", formatEmploymentTypeDisplay(app.employmentType, app.employmentTypeMonths))}
       ${detailField("Salary offer", formatSalaryDisplay(app.salaryOfferCurrency, app.salaryOffer))}
       ${detailField("Salary asked", formatSalaryDisplay(app.salaryAskedCurrency, app.salaryAsked))}
@@ -973,12 +1025,27 @@ function closeDeleteConfirm() {
   els.deleteOverlay.hidden = true;
 }
 
+/**
+ * Generic body-scroll lock, not specific to any one modal — toggles a
+ * CSS class rather than manipulating inline styles directly, so the
+ * actual overflow rule stays in style.css. unlockBodyScroll() is safe
+ * to call even when not currently locked (no-op in that case).
+ */
+function lockBodyScroll() {
+  document.body.classList.add("scroll-locked");
+}
+function unlockBodyScroll() {
+  document.body.classList.remove("scroll-locked");
+}
+
 function openHowToUse() {
   els.howToUseOverlay.hidden = false;
+  lockBodyScroll();
 }
 
 function closeHowToUse() {
   els.howToUseOverlay.hidden = true;
+  unlockBodyScroll();
 }
 
 function confirmDelete() {
@@ -1163,6 +1230,7 @@ function attachEventListeners() {
         overlay.hidden = true;
         if (overlay === els.deleteOverlay) pendingDeleteId = null;
         if (overlay === els.detailsOverlay) currentDetailsId = null;
+        if (overlay === els.howToUseOverlay) unlockBodyScroll();
       }
     });
   });

@@ -46,6 +46,13 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* Generic body-scroll lock — not specific to any one modal. Applied via
+   lockBodyScroll()/unlockBodyScroll() in script.js while the How to Use
+   modal is open, so the page behind it can't scroll. */
+body.scroll-locked {
+  overflow: hidden;
+}
+
 h1, h2, h3 { font-family: var(--font-head); margin: 0; }
 
 a { color: var(--primary); }
@@ -150,7 +157,7 @@ button { font-family: inherit; cursor: pointer; }
    Main layout
    ========================================================= */
 .app-main {
-  max-width: 1180px;
+  max-width: min(1600px, 94vw);
   margin: 0 auto;
   padding: 28px clamp(16px, 4vw, 40px) 80px;
 }
@@ -315,6 +322,27 @@ button { font-family: inherit; cursor: pointer; }
 .ledger td.cell-title { font-weight: 600; }
 .ledger td.cell-muted { color: var(--ink-soft); }
 
+.ledger td.cell-ai-summary {
+  display: table-cell;
+  padding: 10px 10px;
+  line-height: 1.5;
+}
+.ledger td.cell-ai-summary .ai-match__breakdown-points,
+.ledger td.cell-ai-summary .ai-match__breakdown-pct,
+.ledger td.cell-ai-summary .cell-ai-pending {
+  display: block;
+}
+/* Always render the (possibly empty) points line before the percentage
+   — see aiMatchSummaryHtml() in script.js — so the percentage itself
+   lands on the same vertical position whether or not a points line has
+   actual text, instead of Overall Match's single-line percentage
+   sitting higher than Core/Nice-to-Have's two-line version. */
+.cell-ai-pending {
+  font-size: 11px;
+  color: var(--ink-faint);
+  white-space: nowrap;
+}
+
 .ledger__actions-col { text-align: right; }
 .ledger td.cell-actions { text-align: right; white-space: nowrap; }
 
@@ -328,6 +356,7 @@ button { font-family: inherit; cursor: pointer; }
   border-radius: var(--radius-sm);
 }
 .row-action:hover { background: var(--primary-soft); color: var(--primary-dark); }
+.row-action:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
 .row-action--danger:hover { background: var(--status-rejected-bg); color: var(--status-rejected-fg); }
 
 /* =========================================================
@@ -379,6 +408,24 @@ button { font-family: inherit; cursor: pointer; }
   font-size: 13px;
   color: var(--ink-soft);
   margin-bottom: 10px;
+}
+
+.app-card__ai-summary {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+  padding: 10px;
+  background: var(--bg);
+  border-radius: var(--radius-sm);
+  margin-bottom: 10px;
+}
+.app-card__ai-item { display: flex; flex-direction: column; gap: 2px; }
+.app-card__ai-label {
+  font-size: 10.5px;
+  font-weight: 600;
+  color: var(--ink-faint);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
 }
 
 .app-card__actions { display: flex; gap: 6px; }
@@ -453,6 +500,34 @@ button { font-family: inherit; cursor: pointer; }
   flex-shrink: 0;
 }
 
+/* Details-panel-only modifier: adds a left slot for the Analyze/
+   Re-analyze button alongside the existing right-aligned Edit/Close
+   group. Scoped to this modifier class, not the base .panel__footer
+   rule above, so the Add/Edit form's Save/Cancel footer (which also
+   uses .panel__footer) is completely unaffected. */
+.panel__footer--split {
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.panel__footer-right {
+  display: flex;
+  gap: 10px;
+}
+
+/* Fixed analysis-status area, between the scrollable body and the
+   footer. No padding of its own — the status/notice elements rendered
+   inside it (see js/resume.js) already carry their own spacing, so when
+   none of them are present this area takes up zero height instead of
+   leaving a blank gap. */
+.panel__fixed-status {
+  padding: 0 20px;
+  flex-shrink: 0;
+}
+.panel__fixed-status:empty {
+  display: none;
+}
+
 /* Sits above the footer (which is ~70px tall) with a comfortable margin,
    so it never overlaps the Edit/Close buttons. Positioned relative to
    .panel (see .panel's position:relative), not the scroll container, so
@@ -475,6 +550,15 @@ button { font-family: inherit; cursor: pointer; }
   box-shadow: 0 2px 8px rgba(28, 36, 48, 0.12);
   cursor: pointer;
   z-index: 5;
+}
+/* When the fixed status area actually has visible content (an error
+   message, or a current/stale analysis notice), the go-to-top button
+   needs to clear that too, not just the footer — bumped further up
+   only in that case rather than reserving the extra space always. */
+.panel:has(#aiMatchStatus:not(:empty)) .go-to-top-btn,
+.panel:has(.ai-match__current-notice) .go-to-top-btn,
+.panel:has(.ai-match__stale-notice) .go-to-top-btn {
+  bottom: 150px;
 }
 .go-to-top-btn:hover {
   background: var(--primary-soft);
@@ -624,6 +708,15 @@ button { font-family: inherit; cursor: pointer; }
   font-size: 13.5px;
   color: var(--status-offer-fg);
   min-height: 18px;
+}
+
+/* Scoped to this one instance only — it now lives in the fixed status
+   area above the Details panel's footer, which should collapse to zero
+   height when there's nothing to show, unlike other .form-msg uses
+   (e.g. #formMsg) that intentionally reserve space to avoid layout
+   jump. */
+#aiMatchStatus:empty {
+  display: none;
 }
 
 .form-msg--error { color: var(--status-rejected-fg); }
