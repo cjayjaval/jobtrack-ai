@@ -6,9 +6,23 @@ It started as a local job application tracker and has evolved into a portfolio p
 
 ## Current Version
 
-**v0.3.0 — AI Job Match**
+**v0.4.0 — Dashboard Redesign & Theme System**
 
 ## Features
+
+### Dashboard
+
+The JobTrack AI dashboard provides a centralized overview of job search activity.
+
+It includes:
+
+- Application statistics and status summaries
+- Quick access to application management
+- Search, filtering, and sorting
+- Responsive dashboard layout
+- Light and dark appearance modes
+- Persistent theme preference
+- Updated visual design and navigation
 
 ### Job Application Tracking
 
@@ -132,6 +146,19 @@ The Application Details workspace includes:
 
 The progress percentage is an estimated visual indicator and does not represent measured backend completion progress.
 
+## Appearance and Theme System
+
+JobTrack AI includes a dedicated appearance system supporting:
+
+- Light mode
+- Dark mode
+- Persistent theme preference
+- Theme-specific visual assets
+- Consistent styling across the application shell and dashboard
+- Theme initialization before page rendering to reduce incorrect-theme flashing
+
+Theme behavior is separated into its own frontend module to keep appearance logic independent from the main application logic.
+
 ## Architecture
 
 ### Frontend
@@ -139,6 +166,7 @@ The progress percentage is an estimated visual indicator and does not represent 
 - HTML
 - CSS
 - Vanilla JavaScript
+- Modular JavaScript for dashboard, application shell, and theme behavior
 - PDF.js
 - Browser `localStorage`
 
@@ -185,9 +213,15 @@ JobTrack-AI/
 ├── README.md
 ├── .gitignore
 ├── assets/
+│   ├── bg-dark.png
+│   ├── bg-light.png
+│   ├── logo-mark.png
 │   └── logo.png
 ├── js/
-│   └── resume.js
+│   ├── dashboard.js
+│   ├── resume.js
+│   ├── shell.js
+│   └── theme.js
 └── server/
     ├── server.js
     ├── package.json
@@ -212,3 +246,19 @@ JobTrack-AI/
         ├── schemaValidator.js
         ├── scoring.js
         └── scoring.test.js
+```
+
+## Project Status
+
+JobTrack AI is an actively developed personal portfolio project.
+
+The project is used to practice and demonstrate:
+
+- Software QA and test design
+- Frontend development
+- API integration
+- AI-assisted application features
+- Deterministic scoring and validation
+- Security-conscious AI integration
+- Git and GitHub development workflows
+- Incremental product development
