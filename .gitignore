@@ -13,3 +13,7 @@ Thumbs.db
 
 # Server
 server/dev/*.local.js
+
+# Reference
+references/
+CLAUDE.md

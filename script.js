@@ -212,7 +212,18 @@ const els = {
   clearSearchBtn: document.getElementById("clearSearchBtn"),
   filterStatus: document.getElementById("filterStatus"),
   filterSource: document.getElementById("filterSource"),
-  sortBy: document.getElementById("sortBy"),
+  filterDateFrom: document.getElementById("filterDateFrom"),
+  filterDateTo: document.getElementById("filterDateTo"),
+  filterWorkArrangement: document.getElementById("filterWorkArrangement"),
+  filterPanel: document.getElementById("filterPanel"),
+  filtersToggleBtn: document.getElementById("filtersToggleBtn"),
+  filtersCount: document.getElementById("filtersCount"),
+  dateRangeMsg: document.getElementById("dateRangeMsg"),
+  thDateApplied: document.getElementById("thDateApplied"),
+  sortDateBtn: document.getElementById("sortDateBtn"),
+  sortDateCompactBtn: document.getElementById("sortDateCompactBtn"),
+  sortDateCompactText: document.getElementById("sortDateCompactText"),
+  sortStatus: document.getElementById("sortStatus"),
   resetFiltersBtn: document.getElementById("resetFiltersBtn"),
 
   // list
@@ -268,6 +279,9 @@ let newApplicationOpenedAt = null;
 function init() {
   populateSelect(els.filterStatus, STATUSES, "All statuses");
   populateSelect(els.filterSource, SOURCES, "All sources");
+  lastValidDateRange = readDateRange();
+  syncDateRangeUi();
+  syncDateSortControls();
   populateSkillsGrid(document.getElementById("requiredSkillsGrid"), "reqSkill");
   populateSkillsGrid(document.getElementById("niceToHaveSkillsGrid"), "niceSkill");
   renderAll();
@@ -415,6 +429,7 @@ function renderSummary() {
 /** Applies search + filters + sort, then draws the table and card list. */
 function renderList() {
   hidePopover();
+  syncFiltersCount();
   const visible = getFilteredAndSortedApplications();
 
   const hasAnyApplications = applications.length > 0;
@@ -441,11 +456,140 @@ function renderList() {
   renderCardItems(visible);
 }
 
+/* ---------------------------------------------------------
+   Date range, Work arrangement and Date applied sort (Applications toolbar)
+
+   Dates are compared as plain "YYYY-MM-DD" calendar dates against
+   app.dateApplied. No Date objects, no UTC, no timezone conversion, and
+   dateAppliedTimestamp is never read or changed here.
+   --------------------------------------------------------- */
+
+const ISO_DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+const WORK_ARRANGEMENT_UNSPECIFIED = "__unspecified__"; // the filter value for "Not specified"
+const DATE_SORT_TEXT = {
+  desc: { label: "Newest first", aria: "descending", tip: "Currently newest first. Click to sort oldest first.", spoken: "newest first" },
+  asc: { label: "Oldest first", aria: "ascending", tip: "Currently oldest first. Click to sort newest first.", spoken: "oldest first" },
+};
+
+let dateSortDirection = "desc"; // newest first is the default; one state shared by the table header and the card control
+let lastValidDateRange = { from: "", to: "" };
+
+function isoDateOrEmpty(value) {
+  // Years below 1000 are what a date field passes through while a year is still being
+  // typed ("0002", "0020", "0202" on the way to "2026"): treat them as not-a-date yet.
+  return typeof value === "string" && ISO_DATE_PATTERN.test(value) && Number(value.slice(0, 4)) >= 1000 ? value : "";
+}
+
+/**
+ * Set or remove a min/max limit ONLY when it actually changes. Chromium resets the
+ * in-progress edit of a date field whenever its own min/max attribute is assigned,
+ * even to the same value, which would wipe a date the person is still typing.
+ */
+function setDateLimit(input, attribute, value) {
+  if (value) {
+    if (input.getAttribute(attribute) !== value) input.setAttribute(attribute, value);
+  } else if (input.hasAttribute(attribute)) {
+    input.removeAttribute(attribute);
+  }
+}
+
+/**
+ * The date range the list should use right now. Both empty = every date.
+ * If the two inputs ever disagree (From after To: typing, stale state,
+ * programmatic assignment) the last VALID range is kept instead of guessing,
+ * and `invalid` is set so the UI can say so.
+ */
+function readDateRange() {
+  const from = isoDateOrEmpty(els.filterDateFrom.value);
+  const to = isoDateOrEmpty(els.filterDateTo.value);
+  if (from && to && from > to) return { from: lastValidDateRange.from, to: lastValidDateRange.to, invalid: true };
+  return { from, to, invalid: false };
+}
+
+/** Inclusive on both ends; a missing/odd dateApplied can never match an active date filter. */
+function dateInRange(app, range) {
+  if (!range.from && !range.to) return true;
+  const date = isoDateOrEmpty(app.dateApplied);
+  if (!date) return false;
+  return (!range.from || date >= range.from) && (!range.to || date <= range.to);
+}
+
+function matchesWorkArrangement(app, filterValue) {
+  if (!filterValue) return true;
+  const value = typeof app.workArrangement === "string" ? app.workArrangement.trim() : "";
+  return filterValue === WORK_ARRANGEMENT_UNSPECIFIED ? value === "" : value === filterValue;
+}
+
+/** Each picker only offers dates that keep the range valid; shows/clears the validation message. */
+function syncDateRangeUi() {
+  const from = isoDateOrEmpty(els.filterDateFrom.value);
+  const to = isoDateOrEmpty(els.filterDateTo.value);
+  setDateLimit(els.filterDateTo, "min", from);
+  setDateLimit(els.filterDateFrom, "max", to);
+  const invalid = Boolean(from && to && from > to);
+  els.dateRangeMsg.textContent = invalid ? "Date from must be on or before Date to. Showing the last valid range until this is fixed." : "";
+  els.dateRangeMsg.hidden = !invalid;
+  [els.filterDateFrom, els.filterDateTo].forEach((input) => {
+    if (invalid) input.setAttribute("aria-invalid", "true"); else input.removeAttribute("aria-invalid");
+  });
+}
+
+function onDateFilterChange() {
+  const range = readDateRange();
+  if (!range.invalid) lastValidDateRange = { from: range.from, to: range.to };
+  syncDateRangeUi();
+  renderList();
+}
+
+/** Keeps the table header button, the card control and aria-sort telling the same story. */
+function syncDateSortControls() {
+  const text = DATE_SORT_TEXT[dateSortDirection];
+  els.thDateApplied.setAttribute("aria-sort", text.aria);
+  [els.sortDateBtn, els.sortDateCompactBtn].forEach((button) => {
+    button.setAttribute("data-dir", dateSortDirection);
+    button.title = text.tip; // the tooltip (and its description for assistive tech)
+  });
+  els.sortDateCompactText.textContent = text.label;
+}
+
+/**
+ * How many filters inside the collapsible panel are active: Date range (From and/or To
+ * together = ONE), Status, Source, Work arrangement. Search is always visible and the
+ * Date applied sort is not a filter, so neither counts. "All" is inactive. It reads the
+ * range the list actually uses, so it always agrees with the results.
+ */
+function activeFilterCount() {
+  const range = readDateRange();
+  return (range.from || range.to ? 1 : 0) +
+    (els.filterStatus.value ? 1 : 0) +
+    (els.filterSource.value ? 1 : 0) +
+    (els.filterWorkArrangement.value ? 1 : 0);
+}
+
+function syncFiltersCount() {
+  const count = activeFilterCount();
+  els.filtersCount.textContent = count > 0 ? " (" + count + ")" : "";
+}
+
+/** Compact layout only: the panel starts collapsed (never remembered) and collapsing keeps every value. */
+function setFiltersPanelOpen(open) {
+  els.filterPanel.classList.toggle("is-collapsed", !open);
+  els.filtersToggleBtn.setAttribute("aria-expanded", String(open));
+}
+
+function toggleDateSort() {
+  dateSortDirection = dateSortDirection === "desc" ? "asc" : "desc";
+  syncDateSortControls();
+  els.sortStatus.textContent = "Date applied sorted " + DATE_SORT_TEXT[dateSortDirection].spoken + ".";
+  renderList();
+}
+
 function getFilteredAndSortedApplications() {
   const query = els.searchInput.value.trim().toLowerCase();
   const statusFilter = els.filterStatus.value;
   const sourceFilter = els.filterSource.value;
-  const sortValue = els.sortBy.value;
+  const workFilter = els.filterWorkArrangement.value;
+  const dateRange = readDateRange();
 
   let result = applications.filter((app) => {
     const matchesQuery =
@@ -454,7 +598,7 @@ function getFilteredAndSortedApplications() {
       (app.company || "").toLowerCase().includes(query);
     const matchesStatus = !statusFilter || app.status === statusFilter;
     const matchesSource = !sourceFilter || app.source === sourceFilter;
-    return matchesQuery && matchesStatus && matchesSource;
+    return matchesQuery && matchesStatus && matchesSource && matchesWorkArrangement(app, workFilter) && dateInRange(app, dateRange);
   });
 
   // Original array position, used only as the very last tie-breaker.
@@ -462,7 +606,7 @@ function getFilteredAndSortedApplications() {
 
   result.sort((a, b) => {
     const cmp = compareByDateApplied(a, b, originalIndex);
-    return sortValue === "date-asc" ? cmp : -cmp;
+    return dateSortDirection === "asc" ? cmp : -cmp;
   });
 
   return result;
@@ -534,10 +678,12 @@ function appNumberValue(app) {
  * data to show — otherwise it is plain text, never a button that leads to
  * an empty or invented breakdown.
  */
-function overallMatchHtml(app) {
+function overallMatchHtml(app, pendingText) {
   const analysis = app.aiAnalysis;
   if (!analysis || typeof analysis.matchScore !== "number") {
-    return `<span class="cell-ai-pending">Not analyzed yet</span>`;
+    // pendingText is optional: the table keeps its "Not analyzed yet"; the
+    // compact lists (mobile cards, Dashboard) pass a shorter "Not analyzed".
+    return `<span class="cell-ai-pending">${escapeHtml(pendingText || "Not analyzed yet")}</span>`;
   }
   const pct = `${analysis.matchScore.toFixed(2)}%`;
   if (!isUsableTier(analysis.core) && !isUsableTier(analysis.nth)) {
@@ -577,6 +723,21 @@ function matchPopoverHtml(app) {
   return section("Core Qualifications", analysis.core) + "\n" + section("Nice-to-Have", analysis.nth);
 }
 
+/** What the Applications list (table AND cards) shows for Client based / Salary offer: "—" when empty. (The Details panel keeps using formatClientBasedDisplay directly.) */
+function listClientBasedText(app) {
+  // "Other" already requires a Client Location, so the list shows just that location
+  // ("Australia", not "Other: Australia"). Presentation only: nothing stored changes.
+  // A legacy "Other" with no location uses the list's usual "—" rather than a bare "Other".
+  if (app.clientBased === "Other") {
+    const location = typeof app.clientBasedOther === "string" ? app.clientBasedOther.trim() : "";
+    return location || "—";
+  }
+  return formatClientBasedDisplay(app.clientBased, app.clientBasedOther) || "—";
+}
+function listSalaryOfferText(app) {
+  return formatSalaryDisplay(app.salaryOfferCurrency, app.salaryOffer) || "—";
+}
+
 function renderTableRows(list) {
   els.ledgerBody.innerHTML = "";
 
@@ -585,15 +746,13 @@ function renderTableRows(list) {
     // Missing data shows an em dash here (not "Not specified"); Salary offer
     // uses the same shared formatSalaryDisplay() as the Details panel, which
     // already treats a blank or whitespace-only amount as empty.
-    const clientBasedText = formatClientBasedDisplay(app.clientBased, app.clientBasedOther);
-    const salaryOfferText = formatSalaryDisplay(app.salaryOfferCurrency, app.salaryOffer);
     tr.innerHTML = `
       <td class="cell-muted">${escapeHtml(app.appNumber || "—")}</td>
       <td class="cell-ai-summary">${overallMatchHtml(app)}</td>
       <td class="cell-title">${escapeHtml(app.jobTitle)}</td>
       <td>${escapeHtml(app.company)}</td>
-      <td class="cell-muted">${escapeHtml(clientBasedText || "—")}</td>
-      <td class="cell-muted">${escapeHtml(salaryOfferText || "—")}</td>
+      <td class="cell-muted">${escapeHtml(listClientBasedText(app))}</td>
+      <td class="cell-muted">${escapeHtml(listSalaryOfferText(app))}</td>
       <td class="cell-muted">${escapeHtml(app.source)}</td>
       <td class="cell-muted">${formatDateAppliedHtml(app)}</td>
       <td>${statusPillHtml(app.status)}</td>
@@ -602,9 +761,9 @@ function renderTableRows(list) {
     `;
     const actionsCell = tr.querySelector(".cell-actions");
     const analyzeLabel = app.aiAnalysis ? "View Job Match" : "Analyze Job Match";
-    actionsCell.appendChild(makeRowActionButton("🔍", analyzeLabel, () => openDetails(app.id, { scrollToAnalysis: true })));
-    actionsCell.appendChild(makeRowActionButton("✏️", "Edit Application", () => openForm(app.id)));
-    actionsCell.appendChild(makeRowActionButton("🗑️", "Delete Application", () => openDeleteConfirm(app.id), true));
+    actionsCell.appendChild(makeRowActionButton(ROW_ACTION_ICONS.view, analyzeLabel, () => openDetails(app.id, { scrollToAnalysis: true })));
+    actionsCell.appendChild(makeRowActionButton(ROW_ACTION_ICONS.edit, "Edit Application", () => openForm(app.id)));
+    actionsCell.appendChild(makeRowActionButton(ROW_ACTION_ICONS.delete, "Delete Application", () => openDeleteConfirm(app.id), true));
     els.ledgerBody.appendChild(tr);
   });
 }
@@ -615,35 +774,53 @@ function renderCardItems(list) {
   list.forEach((app) => {
     const card = document.createElement("div");
     card.className = "app-card";
+    // Compact card, top to bottom: ID + status | title + company + Overall Match |
+    // source, work arrangement, salary | applied date + client based | actions.
+    // The date is DATE ONLY here (formatDate): the card never shows the time. This
+    // is presentation only — dateApplied / dateAppliedTimestamp are not touched.
     card.innerHTML = `
       <div class="app-card__top">
-        <div>
-          <div class="app-card__id">${escapeHtml(app.appNumber || "—")}</div>
+        <span class="app-card__id">${escapeHtml(app.appNumber || "—")}</span>
+        ${statusPillHtml(app.status)}
+      </div>
+      <div class="app-card__main">
+        <div class="app-card__primary">
           <div class="app-card__title">${escapeHtml(app.jobTitle)}</div>
           <div class="app-card__company">${escapeHtml(app.company)}</div>
         </div>
-        ${statusPillHtml(app.status)}
-      </div>
-      <div class="app-card__ai-summary">
-        <span class="app-card__ai-label">Overall Match</span>
-        ${overallMatchHtml(app)}
+        <div class="app-card__match">${overallMatchHtml(app, "Not analyzed")}</div>
       </div>
       <div class="app-card__meta">
         <span>${escapeHtml(app.source)}</span>
-        <span>${formatDateAppliedHtml(app)}</span>
         <span>${escapeHtml(app.workArrangement || "Not specified")}</span>
+        <span>${escapeHtml(listSalaryOfferText(app))}</span>
+      </div>
+      <div class="app-card__meta">
+        <span>Applied ${escapeHtml(formatDate(app.dateApplied))}</span>
+        <span>${escapeHtml(listClientBasedText(app))}</span>
       </div>
       <div class="app-card__actions"></div>
     `;
     const actionsCell = card.querySelector(".app-card__actions");
     const analyzeLabel = app.aiAnalysis ? "View Job Match" : "Analyze Job Match";
-    actionsCell.appendChild(makeRowActionButton("🔍", analyzeLabel, () => openDetails(app.id, { scrollToAnalysis: true })));
-    actionsCell.appendChild(makeRowActionButton("✏️", "Edit Application", () => openForm(app.id)));
-    actionsCell.appendChild(makeRowActionButton("🗑️", "Delete Application", () => openDeleteConfirm(app.id), true));
+    actionsCell.appendChild(makeRowActionButton(ROW_ACTION_ICONS.view, analyzeLabel, () => openDetails(app.id, { scrollToAnalysis: true })));
+    actionsCell.appendChild(makeRowActionButton(ROW_ACTION_ICONS.edit, "Edit Application", () => openForm(app.id)));
+    actionsCell.appendChild(makeRowActionButton(ROW_ACTION_ICONS.delete, "Delete Application", () => openDeleteConfirm(app.id), true));
     els.cardList.appendChild(card);
   });
 }
 
+/** Line icons for the View / Edit / Delete row actions (decorative: each button carries its own accessible name). */
+const ROW_ACTION_ICONS = {
+  view:
+    '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>',
+  edit:
+    '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M17 3a2.83 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z"/></svg>',
+  delete:
+    '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 6h18"/><path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>',
+};
+
+/** `icon` is trusted, static SVG markup (see ROW_ACTION_ICONS), never user text. */
 function makeRowActionButton(icon, accessibleLabel, onClick, isDanger) {
   const btn = document.createElement("button");
   btn.type = "button";
@@ -1527,14 +1704,28 @@ function attachEventListeners() {
   });
   els.filterStatus.addEventListener("change", renderList);
   els.filterSource.addEventListener("change", renderList);
-  els.sortBy.addEventListener("change", renderList);
+  els.filterWorkArrangement.addEventListener("change", renderList);
+  // "input" gives a live update while a date is picked/typed; "change" covers browsers that only fire that.
+  [els.filterDateFrom, els.filterDateTo].forEach((input) => {
+    input.addEventListener("input", onDateFilterChange);
+    input.addEventListener("change", onDateFilterChange);
+  });
+  els.filtersToggleBtn.addEventListener("click", () => setFiltersPanelOpen(els.filtersToggleBtn.getAttribute("aria-expanded") !== "true"));
+  els.sortDateBtn.addEventListener("click", toggleDateSort);
+  els.sortDateCompactBtn.addEventListener("click", toggleDateSort);
 
   els.resetFiltersBtn.addEventListener("click", () => {
     els.searchInput.value = "";
     els.clearSearchBtn.hidden = true;
     els.filterStatus.value = "";
     els.filterSource.value = "";
-    els.sortBy.value = "date-desc";
+    els.filterWorkArrangement.value = "";
+    els.filterDateFrom.value = "";
+    els.filterDateTo.value = "";
+    lastValidDateRange = { from: "", to: "" };
+    syncDateRangeUi(); // also clears the min/max limits and any validation message
+    dateSortDirection = "desc"; // back to Newest first
+    syncDateSortControls();
     renderList();
   });
 

@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>JobTrack AI</title>
+<!-- Sets <html data-theme> from the saved appearance before the first paint (no wrong-theme flash). Keep it before the stylesheets. -->
+<script src="js/theme.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -13,45 +15,171 @@
 </head>
 <body>
 
-  <!-- ===== Header ===== -->
-  <header class="app-header">
-    <div class="app-header__brand">
-      <img class="app-header__logo" src="assets/logo.png" alt="JobTrack AI — Track Every Application. Land the Right Match.">
-    </div>
-    <div class="app-header__actions">
-      <button type="button" class="btn btn--ghost" id="howToUseBtn">How to use</button>
-      <button type="button" class="btn btn--ghost" id="exportBtn">Export backup</button>
-      <button type="button" class="btn btn--primary" id="addBtn">+ Add application</button>
-    </div>
-  </header>
+  <a class="skip-link" id="skipLink" href="#main-content">Skip to main content</a>
 
-  <main class="app-main">
+  <div class="app-shell" id="appShell">
+    <div class="drawer-scrim" id="navScrim" hidden></div>
 
-    <!-- ===== Summary cards ===== -->
-    <section class="summary" aria-label="Application summary">
-      <div class="summary-card" data-stat="total">
-        <span class="summary-card__label">Total</span>
-        <span class="summary-card__value" id="statTotal">0</span>
+    <!-- ===== Sidebar ===== -->
+    <aside class="sidebar" id="sidebar" aria-label="JobTrack AI sidebar">
+      <div class="sidebar__brand">
+        <!-- Temporary logo: replaceable. Swap the file (or this src); the slot is a fixed square. -->
+        <span class="brand__mark"><img src="assets/logo-mark.png" alt="" width="256" height="224"></span>
+        <span class="brand__text">
+          <span class="brand__name">JobTrack AI</span>
+          <span class="brand__tag">Track &bull; Match &bull; Land</span>
+        </span>
       </div>
-      <div class="summary-card summary-card--applied" data-stat="applied">
-        <span class="summary-card__label">Applied</span>
-        <span class="summary-card__value" id="statApplied">0</span>
-      </div>
-      <div class="summary-card summary-card--interview" data-stat="interview">
-        <span class="summary-card__label">Interview</span>
-        <span class="summary-card__value" id="statInterview">0</span>
-      </div>
-      <div class="summary-card summary-card--offer" data-stat="offer">
-        <span class="summary-card__label">Offer</span>
-        <span class="summary-card__value" id="statOffer">0</span>
-      </div>
-      <div class="summary-card summary-card--rejected" data-stat="failed">
-        <span class="summary-card__label">Failed</span>
-        <span class="summary-card__value" id="statFailed">0</span>
-      </div>
-    </section>
 
-    <!-- ===== Toolbar: search / filter / sort ===== -->
+      <nav class="sidebar__nav" aria-label="Primary">
+        <a class="nav-item" href="#dashboard" data-route="dashboard" title="Dashboard"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v9.5h13V10"/><path d="M10 19.5v-5h4v5"/></svg><span class="nav-item__label">Dashboard</span></a>
+        <a class="nav-item" href="#applications" data-route="applications" title="Applications"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="5" y="5" width="14" height="16" rx="2"/><path d="M9 3h6v3H9z"/><path d="M9 11h6M9 15h6"/></svg><span class="nav-item__label">Applications</span></a>
+        <a class="nav-item" href="#analytics" data-route="analytics" title="Analytics (coming soon)"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 20V11M12 20V5M19 20v-6"/></svg><span class="nav-item__label">Analytics</span><span class="nav-pill">Soon</span></a>
+        <a class="nav-item" href="#resumes" data-route="resumes" title="Resume Library (coming soon)"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M3.5 7.5a2 2 0 0 1 2-2H10l2 2.5h6.5a2 2 0 0 1 2 2V17a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/></svg><span class="nav-item__label">Resume Library</span><span class="nav-pill">Soon</span></a>
+      </nav>
+
+      <div class="sidebar__footer">
+        <div class="sidebar__utilities">
+          <button type="button" class="nav-item" id="howToUseBtn" title="How to use"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.6a2.5 2.5 0 1 1 3.5 2.3c-.7.4-1.1.9-1.1 1.7"/><path d="M12 17h.01"/></svg><span class="nav-item__label">How to use</span></button>
+          <button type="button" class="nav-item" id="exportBtn" title="Export backup"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 4v11"/><path d="m7 11 5 5 5-5"/><path d="M5 20h14"/></svg><span class="nav-item__label">Export backup</span></button>
+        </div>
+        <a class="nav-item" href="#settings" data-route="settings" title="Settings"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 6h3M13 6h7M4 12h9M19 12h1M4 18h5M15 18h5"/><circle cx="10" cy="6" r="2.2"/><circle cx="16" cy="12" r="2.2"/><circle cx="12" cy="18" r="2.2"/></svg><span class="nav-item__label">Settings</span></a>
+        <a class="profile-chip" href="#settings" id="profileChip" title="Profile settings">
+          <span class="profile-chip__avatar" id="profileChipAvatar" aria-hidden="true"></span>
+          <span class="profile-chip__text">
+            <span class="profile-chip__name" id="profileChipName">Set your name</span>
+            <span class="profile-chip__sub">Saved in this browser</span>
+          </span>
+        </a>
+      </div>
+    </aside>
+
+    <div class="app-content">
+      <!-- ===== Top bar ===== -->
+      <header class="topbar" id="topbar">
+        <button type="button" class="topbar__menu" id="navToggleBtn" aria-label="Open navigation menu" aria-controls="sidebar" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 7h16M4 12h16M4 17h16"/></svg></button>
+        <span class="topbar__title" id="topbarTitle">Dashboard</span>
+        <button type="button" class="btn btn--primary" id="addBtn">+ Add application</button>
+      </header>
+
+      <main class="app-main" id="main-content" tabindex="-1">
+
+        <!-- ===== Dashboard view (Stage 2: header, six summary cards, recent applications, quick actions) ===== -->
+        <section class="view" id="view-dashboard" data-view="dashboard" aria-labelledby="dashboardHeading">
+          <h1 class="view__title" id="dashboardHeading" tabindex="-1"><span id="greetingText">Welcome</span></h1>
+          <p class="view__subtitle">Here's your job search overview.</p>
+
+          <!-- Summary cards. The five original stat ids are kept on the value elements: script.js
+               still fills them (its renderSummary is untouched). js/dashboard.js adds Rejected and
+               the "% of total" lines. -->
+          <section class="summary" aria-label="Application summary">
+          <div class="summary-card summary-card--total" data-stat="total">
+            <span class="summary-card__icon" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M8 3h6l5 5v11a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h6"/></svg></span>
+            <div class="summary-card__text">
+              <span class="summary-card__label">Total Applications</span>
+              <span class="summary-card__value" id="statTotal">0</span>
+            </div>
+          </div>
+          <div class="summary-card summary-card--applied" data-stat="applied">
+            <span class="summary-card__icon" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M21 3 10 14"/><path d="m21 3-7 18-4-7-7-4 18-7z"/></svg></span>
+            <div class="summary-card__text">
+              <span class="summary-card__label">Applied</span>
+              <span class="summary-card__value" id="statApplied">0</span>
+            </div>
+            <div class="summary-card__meta">
+              <span class="summary-card__pct">0% of total</span>
+              <span class="summary-card__bar" aria-hidden="true"><span></span></span>
+            </div>
+          </div>
+          <div class="summary-card summary-card--interview" data-stat="interview">
+            <span class="summary-card__icon" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="9" cy="8" r="3.2"/><path d="M3.5 20c.6-3.4 2.8-5.2 5.5-5.2s4.9 1.8 5.5 5.2"/><circle cx="17" cy="9" r="2.5"/><path d="M16.5 14.4c2.3.2 4 1.8 4.5 4.6"/></svg></span>
+            <div class="summary-card__text">
+              <span class="summary-card__label">Interviews</span>
+              <span class="summary-card__value" id="statInterview">0</span>
+            </div>
+            <div class="summary-card__meta">
+              <span class="summary-card__pct">0% of total</span>
+              <span class="summary-card__bar" aria-hidden="true"><span></span></span>
+            </div>
+          </div>
+          <div class="summary-card summary-card--offer" data-stat="offer">
+            <span class="summary-card__icon" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M9 7V5a2 2 0 0 1 2-2h2a2 2 0 0 1 2 2v2"/><path d="M3 13h18"/></svg></span>
+            <div class="summary-card__text">
+              <span class="summary-card__label">Offered</span>
+              <span class="summary-card__value" id="statOffer">0</span>
+            </div>
+            <div class="summary-card__meta">
+              <span class="summary-card__pct">0% of total</span>
+              <span class="summary-card__bar" aria-hidden="true"><span></span></span>
+            </div>
+          </div>
+          <div class="summary-card summary-card--rejected" data-stat="rejected">
+            <span class="summary-card__icon" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><path d="m9 9 6 6M15 9l-6 6"/></svg></span>
+            <div class="summary-card__text">
+              <span class="summary-card__label">Rejected</span>
+              <span class="summary-card__value" id="statRejected">0</span>
+            </div>
+            <div class="summary-card__meta">
+              <span class="summary-card__pct">0% of total</span>
+              <span class="summary-card__bar" aria-hidden="true"><span></span></span>
+            </div>
+          </div>
+          <div class="summary-card summary-card--failed" data-stat="failed">
+            <span class="summary-card__icon" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 4 2.8 19.5a1 1 0 0 0 .9 1.5h16.6a1 1 0 0 0 .9-1.5L12 4z"/><path d="M12 10v4.5"/><path d="M12 17.5h.01"/></svg></span>
+            <div class="summary-card__text">
+              <span class="summary-card__label">Failed</span>
+              <span class="summary-card__value" id="statFailed">0</span>
+            </div>
+            <div class="summary-card__meta">
+              <span class="summary-card__pct">0% of total</span>
+              <span class="summary-card__bar" aria-hidden="true"><span></span></span>
+            </div>
+          </div>
+          </section>
+
+          <div class="dash-grid">
+            <!-- Recent applications: rendered by js/dashboard.js from the saved applications only -->
+            <section class="dash-panel dash-recent" aria-labelledby="recentHeading">
+              <div class="dash-panel__head">
+                <div>
+                  <h2 id="recentHeading">Recent Applications</h2>
+                  <p class="dash-panel__sub">Your latest job applications</p>
+                </div>
+                <a class="dash-link" id="recentViewAll" href="#applications">View all applications <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M5 12h14"/><path d="m13 6 6 6-6 6"/></svg></a>
+              </div>
+              <div id="recentBody"></div>
+            </section>
+
+            <!-- Quick actions: each one reuses an existing control or route; no new behavior -->
+            <section class="dash-panel dash-quick" aria-labelledby="quickHeading">
+              <h2 id="quickHeading">Quick Actions</h2>
+              <div class="quick-list">
+                <button type="button" class="quick-action" data-dash-action="add">
+                  <span class="quick-action__tile" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 5v14M5 12h14"/></svg></span>
+                  <span class="quick-action__label">Add Application</span>
+                  <span class="quick-action__chev" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m9 6 6 6-6 6"/></svg></span>
+                </button>
+                <a class="quick-action" href="#applications">
+                  <span class="quick-action__tile" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><rect x="5" y="5" width="14" height="16" rx="2"/><path d="M9 3h6v3H9z"/><path d="M9 11h6M9 15h6"/></svg></span>
+                  <span class="quick-action__label">View Applications</span>
+                  <span class="quick-action__chev" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m9 6 6 6-6 6"/></svg></span>
+                </a>
+                <button type="button" class="quick-action" data-dash-action="howto">
+                  <span class="quick-action__tile" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="9"/><path d="M9.6 9.6a2.5 2.5 0 1 1 3.5 2.3c-.7.4-1.1.9-1.1 1.7"/><path d="M12 17h.01"/></svg></span>
+                  <span class="quick-action__label">How to Use</span>
+                  <span class="quick-action__chev" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m9 6 6 6-6 6"/></svg></span>
+                </button>
+              </div>
+            </section>
+          </div>
+        </section>
+
+        <!-- ===== Applications view (the existing application workflow, unchanged) ===== -->
+        <section class="view" id="view-applications" data-view="applications" aria-labelledby="applicationsHeading" hidden>
+          <h1 class="view__title" id="applicationsHeading" tabindex="-1">Applications</h1>
+          <p class="view__subtitle">Track, search and manage every application.</p>
+
+    <!-- ===== Toolbar: search / date range / filters / reset ===== -->
     <section class="toolbar" aria-label="Search and filters">
       <div class="toolbar__field toolbar__field--search">
         <label for="searchInput" class="sr-only">Search by job title or company</label>
@@ -59,6 +187,35 @@
           <input type="text" id="searchInput" placeholder="Search by job title or company…">
           <button type="button" class="search-clear-btn" id="clearSearchBtn" aria-label="Clear search" hidden>✕</button>
         </div>
+      </div>
+
+      <!-- Compact/card layout only (hidden on desktop): the Filters toggle and the Date applied sort stay
+           visible while the panel below is collapsed. -->
+      <div class="toolbar__compact-bar">
+        <button type="button" class="filters-toggle" id="filtersToggleBtn" aria-expanded="false" aria-controls="filterPanel">
+          <svg class="filters-toggle__icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M4 7h10"/><path d="M18 7h2"/><circle cx="16" cy="7" r="2"/><path d="M4 17h2"/><path d="M10 17h10"/><circle cx="8" cy="17" r="2"/></svg>
+          <span>Filters</span><span class="filters-toggle__count" id="filtersCount"></span>
+          <svg class="filters-toggle__chev" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m6 9 6 6 6-6"/></svg>
+        </button>
+
+        <!-- Shares one state with the table's "Date applied" header button. -->
+        <div class="toolbar__field toolbar__field--sort">
+          <span class="toolbar__label sr-only" id="sortCompactLabel">Date applied</span>
+          <button type="button" class="sort-btn sort-btn--compact" id="sortDateCompactBtn" data-dir="desc" aria-labelledby="sortCompactLabel sortDateCompactText"><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 5v14"/><path d="m6 13 6 6 6-6"/></svg><span id="sortDateCompactText">Newest first</span></button>
+        </div>
+      </div>
+
+      <!-- On desktop this wrapper is invisible to layout (display: contents), so the controls sit in the
+           toolbar row exactly as before. In the compact layout it is the collapsible panel (collapsed by default). -->
+      <div class="toolbar__panel is-collapsed" id="filterPanel">
+      <div class="toolbar__field toolbar__field--date">
+        <label for="filterDateFrom">Date from</label>
+        <input type="date" id="filterDateFrom" aria-describedby="dateRangeMsg">
+      </div>
+
+      <div class="toolbar__field toolbar__field--date">
+        <label for="filterDateTo">Date to</label>
+        <input type="date" id="filterDateTo" aria-describedby="dateRangeMsg">
       </div>
 
       <div class="toolbar__field">
@@ -76,14 +233,21 @@
       </div>
 
       <div class="toolbar__field">
-        <label for="sortBy">Sort by</label>
-        <select id="sortBy">
-          <option value="date-desc">Date applied (newest)</option>
-          <option value="date-asc">Date applied (oldest)</option>
+        <label for="filterWorkArrangement">Work arrangement</label>
+        <select id="filterWorkArrangement">
+          <option value="">All</option>
+          <option value="__unspecified__">Not specified</option>
+          <option value="Remote">Remote</option>
+          <option value="Hybrid">Hybrid</option>
+          <option value="On-site">On-site</option>
         </select>
       </div>
 
       <button type="button" class="btn btn--text" id="resetFiltersBtn">Reset filters</button>
+      </div>
+
+      <p class="toolbar__msg" id="dateRangeMsg" role="alert" hidden></p>
+      <div class="sr-only" id="sortStatus" role="status" aria-live="polite"></div>
     </section>
 
     <!-- ===== Applications list ===== -->
@@ -108,7 +272,7 @@
               <th>Client based</th>
               <th>Salary offer</th>
               <th>Source</th>
-              <th>Date applied</th>
+              <th id="thDateApplied" scope="col" aria-sort="descending"><button type="button" class="sort-btn sort-btn--header" id="sortDateBtn" data-dir="desc"><span>Date applied</span><svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M12 5v14"/><path d="m6 13 6 6 6-6"/></svg></button></th>
               <th>Status</th>
               <th>Work arrangement</th>
               <th class="ledger__actions-col">Actions</th>
@@ -126,7 +290,85 @@
       </div>
 
     </section>
-  </main>
+        </section>
+
+        <!-- ===== Analytics view (placeholder) ===== -->
+        <section class="view" id="view-analytics" data-view="analytics" aria-labelledby="analyticsHeading" hidden>
+          <h1 class="view__title" id="analyticsHeading" tabindex="-1">Analytics</h1>
+          <p class="view__subtitle">Insights about your job search.</p>
+          <div class="placeholder-card">
+            <span class="badge-soon">Coming soon</span>
+            <h2>Analytics is on the way</h2>
+            <p>Trends and charts for your applications will live here. Nothing about your saved applications changes in the meantime.</p>
+          </div>
+        </section>
+
+        <!-- ===== Resume Library view (placeholder) ===== -->
+        <section class="view" id="view-resumes" data-view="resumes" aria-labelledby="resumesHeading" hidden>
+          <h1 class="view__title" id="resumesHeading" tabindex="-1">Resume Library</h1>
+          <p class="view__subtitle">Manage the resumes you analyze against.</p>
+          <div class="placeholder-card">
+            <span class="badge-soon">Coming soon</span>
+            <h2>Resume Library is on the way</h2>
+            <p>For now, your resume is managed from an application's AI Job Match section: open an application from the Applications page to upload, replace or remove it.</p>
+          </div>
+        </section>
+
+        <!-- ===== Settings view ===== -->
+        <section class="view" id="view-settings" data-view="settings" aria-labelledby="settingsHeading" hidden>
+          <h1 class="view__title" id="settingsHeading" tabindex="-1">Settings</h1>
+          <p class="view__subtitle">Preferences for this browser.</p>
+          <div class="settings-grid">
+            <section class="settings-card" aria-labelledby="profileHeading">
+              <h2 id="profileHeading">Profile</h2>
+              <p class="settings-card__hint">Your preferred name is used for greetings. It is saved only in this browser &mdash; this is not an account.</p>
+              <form class="settings-form" id="profileForm" novalidate>
+                <div class="field">
+                  <label for="profileNameInput">Preferred name</label>
+                  <input type="text" id="profileNameInput" maxlength="40" autocomplete="off" placeholder="What should we call you?">
+                </div>
+                <p class="form-msg" id="profileStatus" role="status"></p>
+                <div class="settings-form__actions">
+                  <button type="submit" class="btn btn--primary">Save</button>
+                  <button type="button" class="btn btn--text" id="profileClearBtn">Clear name</button>
+                </div>
+              </form>
+            </section>
+            <section class="settings-card" aria-labelledby="appearanceHeading">
+              <h2 id="appearanceHeading">Appearance</h2>
+              <p class="settings-card__hint">Your appearance preference is saved in this browser.</p>
+              <fieldset class="theme-options">
+                <legend class="sr-only">Choose an appearance</legend>
+                <label class="theme-option">
+                  <input type="radio" name="appearance" value="light-glass" class="theme-option__input" checked>
+                  <span class="theme-option__card">
+                    <span class="theme-option__preview theme-option__preview--light" aria-hidden="true"><i></i><i></i><i></i></span>
+                    <span class="theme-option__text">
+                      <span class="theme-option__name">Light Glass</span>
+                      <span class="theme-option__desc">Bright and soft, with frosted panels.</span>
+                    </span>
+                    <span class="theme-option__check" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></span>
+                  </span>
+                </label>
+                <label class="theme-option">
+                  <input type="radio" name="appearance" value="dark-glass" class="theme-option__input">
+                  <span class="theme-option__card">
+                    <span class="theme-option__preview theme-option__preview--dark" aria-hidden="true"><i></i><i></i><i></i></span>
+                    <span class="theme-option__text">
+                      <span class="theme-option__name">Dark Glass</span>
+                      <span class="theme-option__desc">Calm and low-glare, with the same blue accent.</span>
+                    </span>
+                    <span class="theme-option__check" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="m5 12.5 4.5 4.5L19 7.5"/></svg></span>
+                  </span>
+                </label>
+              </fieldset>
+            </section>
+          </div>
+        </section>
+
+      </main>
+    </div>
+  </div>
 
   <!-- ===== Add / Edit panel ===== -->
   <div class="overlay" id="formOverlay" hidden>
@@ -438,6 +680,25 @@
     </div>
   </div>
 
+  <!-- ===== Welcome / preferred name (optional, never blocks use) ===== -->
+  <div class="overlay overlay--center" id="welcomeOverlay" hidden>
+    <div class="confirm-box" role="dialog" aria-modal="true" aria-labelledby="welcomeTitle" aria-describedby="welcomeDesc">
+      <h2 id="welcomeTitle">Welcome to JobTrack AI</h2>
+      <p id="welcomeDesc">Optional: tell us what to call you. You can change or clear it anytime in Settings. It is saved only in this browser.</p>
+      <form id="welcomeForm" novalidate>
+        <div class="field">
+          <label for="welcomeNameInput">What should we call you?</label>
+          <input type="text" id="welcomeNameInput" maxlength="40" autocomplete="off" placeholder="Your name">
+          <p class="field__error" id="welcomeError" role="alert"></p>
+        </div>
+        <div class="confirm-box__actions">
+          <button type="button" class="btn btn--text" id="welcomeSkipBtn">Skip for now</button>
+          <button type="submit" class="btn btn--primary">Continue</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
   <!-- ===== Toast ===== -->
   <div class="toast" id="toast" role="status" hidden></div>
 
@@ -450,5 +711,7 @@
 
   <script src="script.js"></script>
   <script src="js/resume.js"></script>
+  <script src="js/shell.js"></script>
+  <script src="js/dashboard.js"></script>
 </body>
 </html>

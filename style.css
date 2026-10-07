@@ -1,23 +1,59 @@
 /* =========================================================
    JobTrack AI — Design tokens
+
+   Theme-ready: components should use the SEMANTIC tokens below. The
+   values here are the default "Light Glass" theme. A future preset
+   (e.g. Dark Glass) is just a block that re-defines these same tokens
+   under a selector such as  html[data-theme="dark-glass"] { ... }  —
+   no component CSS should need to change. (No theme switcher exists
+   yet; this is only the groundwork.)
+
+   The older token names (--bg, --surface, --ink, --primary, ...) are
+   kept as aliases at the bottom so every existing rule keeps working.
    ========================================================= */
 :root {
-  --bg: #F6F7FA;
-  --surface: #FFFFFF;
+  color-scheme: light; /* native controls (date/time inputs, scrollbars) follow the theme */
+
+  /* --- Page background ---------------------------------- */
+  --app-bg-solid: #F6F7FA;
+  --app-bg-image: url("assets/bg-light.png");
+  --app-bg-position: center;
+  --app-background:
+    radial-gradient(900px 600px at 6% -10%, rgba(60, 120, 220, 0.10), transparent 62%),
+    radial-gradient(800px 600px at 100% 110%, rgba(31, 169, 127, 0.07), transparent 62%),
+    linear-gradient(180deg, rgba(248, 250, 253, 0.35) 0%, rgba(238, 242, 248, 0.35) 100%);
+
+  /* --- Surfaces ----------------------------------------- */
+  --surface-solid: #FFFFFF;                     /* modals, forms, inputs, popovers: always opaque */
+  --surface-glass: rgba(255, 255, 255, 0.72);   /* large panels over the page background */
+  --surface-glass-strong: rgba(255, 255, 255, 0.90); /* repeated items; also the no-backdrop-filter fallback */
+  --glass-border: rgba(176, 190, 214, 0.55);
+  --glass-shadow: 0 8px 28px rgba(31, 50, 90, 0.07), 0 1px 2px rgba(31, 50, 90, 0.05);
+  --glass-blur: 14px;
+
+  /* --- Text --------------------------------------------- */
+  --text-primary: #0E1A30;
+  --text-secondary: #5B6472;
+  --text-muted: #8A94A6;
+  --text-inverse: #FFFFFF;                      /* on the dark toast */
+
+  /* --- Accent (brand blue) ------------------------------ */
+  --accent: #1150BE;
+  --accent-strong: #0D3D8F;
+  --accent-soft: #E8EEFB;
+  --on-accent: #FFFFFF;                         /* text/icons on solid accent or danger fills */
+  --danger-strong: #8A2E24;
+
+  /* --- Lines, overlays, elevation ----------------------- */
   --border: #E1E4EA;
   --border-strong: #C7CCD6;
+  --scrim: rgba(28, 36, 48, 0.45);
+  --on-accent-track: rgba(255, 255, 255, 0.4);
+  --shadow-popover: 0 8px 24px rgba(28, 36, 48, 0.18);
+  --shadow-panel: -8px 0 24px rgba(28, 36, 48, 0.08);
+  --shadow-float: 0 2px 8px rgba(28, 36, 48, 0.12);
 
-  --ink: #0E1A30;
-  --ink-soft: #5B6472;
-  --ink-faint: #8A94A6;
-
-  --primary: #1150BE;
-  --primary-dark: #0D3D8F;
-  --primary-soft: #E8EEFB;
-
-  --accent: #1FA97F;
-  --accent-soft: #E1F5EE;
-
+  /* --- Status colors (unchanged) ------------------------ */
   --status-toapply-bg: #EEF0F3; --status-toapply-fg: #5B6472;
   --status-applied-bg: #E4EDFA; --status-applied-fg: #2C5C9E;
   --status-interview-bg: #FBF0D9; --status-interview-fg: #9C6604;
@@ -25,12 +61,102 @@
   --status-rejected-bg: #FAE7E4; --status-rejected-fg: #A23A2E;
   --status-withdrawn-bg: #EEF0F3; --status-withdrawn-fg: #7A8190;
 
+  /* --- Shape & type ------------------------------------- */
   --radius-sm: 6px;
   --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-xl: 22px;
 
   --font-head: 'Space Grotesk', 'Segoe UI', sans-serif;
   --font-body: 'Inter', 'Segoe UI', sans-serif;
+
+  /* --- Shell layout ------------------------------------- */
+  --sidebar-w: 248px;      /* narrower in the icon-rail tier, see Responsive */
+  --shell-gap: 20px;
+  --topbar-reserve: 196px; /* room kept at the right of each page heading for the + Add application button (desktop) */
+  --brand-mark-size: 44px; /* the logo is a replaceable image: only this slot size matters */
+  --brand-mark-plate: transparent; /* a theme can put a plate behind the mark if it needs contrast */
+
+  /* --- Appearance preview swatches (Settings): fixed, so each card always shows its own theme --- */
+  --preview-light-bg: #F4F7FC; --preview-light-panel: #FFFFFF; --preview-light-accent: #1150BE; --preview-light-line: #D5DCE8;
+  --preview-dark-bg: #0D1320;  --preview-dark-panel: #1B2539;  --preview-dark-accent: #6EA8FF;  --preview-dark-line: #2C3850;
+
+  /* --- Legacy aliases (existing rules use these names) --- */
+  --bg: var(--app-bg-solid);
+  --surface: var(--surface-solid);
+  --ink: var(--text-primary);
+  --ink-soft: var(--text-secondary);
+  --ink-faint: var(--text-muted);
+  --primary: var(--accent);
+  --primary-dark: var(--accent-strong);
+  --primary-soft: var(--accent-soft);
 }
+
+/* =========================================================
+   Dark Glass — the dark counterpart of Light Glass.
+   Applied by js/theme.js setting <html data-theme="dark-glass">. It only
+   overrides the design tokens above (every rule in this file already reads
+   them, including the legacy --bg / --ink / --primary aliases), plus the
+   few things a token can't express. Light Glass is the :root default and is
+   not touched by anything in this block.
+
+   Feel: professional dark SaaS — deep blue-slate (never pure black), faint
+   frosted panels, calm blue accent. Contrast was checked per pairing
+   (WCAG): body text >= 14:1, secondary 7.8:1, muted 5.3:1, accent 7:1, every
+   status pill >= 5.4:1, form-control borders >= 3:1.
+   ========================================================= */
+:root[data-theme="dark-glass"] {
+  color-scheme: dark; /* native date pickers, select lists and scrollbars go dark too */
+
+  --app-bg-solid: #0D1320;
+  --app-bg-image: url("assets/bg-dark.png");
+  --app-background:
+    radial-gradient(900px 600px at 6% -10%, rgba(80, 140, 240, 0.16), transparent 62%),
+    radial-gradient(800px 600px at 100% 110%, rgba(31, 169, 127, 0.08), transparent 62%),
+    linear-gradient(180deg, rgba(15, 22, 38, 0.40) 0%, rgba(10, 15, 27, 0.50) 100%);
+
+  --surface-solid: #151D2E;
+  --surface-glass: rgba(24, 33, 52, 0.66);
+  --surface-glass-strong: rgba(24, 33, 52, 0.88);
+  --glass-border: rgba(130, 154, 196, 0.22);
+  --glass-shadow: 0 10px 32px rgba(0, 0, 0, 0.38), 0 1px 2px rgba(0, 0, 0, 0.30);
+
+  --text-primary: #E8EDF7;
+  --text-secondary: #A6B1C5;
+  --text-muted: #8591A6;
+  --text-inverse: #0D1320;                 /* the toast turns into a light slab on the dark page */
+
+  --accent: #6EA8FF;                       /* links, icons, selected states, solid buttons */
+  --accent-strong: #9CC4FF;
+  --accent-soft: #1F2F4E;
+  --on-accent: #08142B;                    /* dark navy on the bright blue fill */
+  --danger-strong: #F29A90;
+
+  --border: #263149;
+  --border-strong: #5C6C8E;
+  --scrim: rgba(3, 6, 14, 0.66);
+  --on-accent-track: rgba(8, 20, 43, 0.30);
+  --shadow-popover: 0 10px 28px rgba(0, 0, 0, 0.55);
+  --shadow-panel: -8px 0 24px rgba(0, 0, 0, 0.45);
+  --shadow-float: 0 2px 8px rgba(0, 0, 0, 0.50);
+
+  /* Status colors: same meanings, lighter inks on deep tinted pills. */
+  --status-toapply-bg: #232B3B;   --status-toapply-fg: #A9B3C6;
+  --status-applied-bg: #1B2C4A;   --status-applied-fg: #8DB6F2;
+  --status-interview-bg: #3A2F14; --status-interview-fg: #F0C26A;
+  --status-offer-bg: #14352A;     --status-offer-fg: #6FD3A0;
+  --status-rejected-bg: #3C1D1B;  --status-rejected-fg: #F29A90;
+  --status-withdrawn-bg: #232B3B; --status-withdrawn-fg: #96A0B4;
+}
+
+/* Portrait phones crop the wide artwork heavily; shift the crop toward the
+   left foliage and the main curves so the artwork still reads. */
+@media (max-width: 760px) and (orientation: portrait) {
+  :root { --app-bg-position: 38% center; }
+}
+
+/* Things a token can't express (dark only, so Light Glass stays exactly as approved). */
+:root[data-theme="dark-glass"] ::placeholder { color: var(--text-muted); opacity: 1; }
 
 * { box-sizing: border-box; }
 
@@ -53,6 +179,32 @@ body.scroll-locked {
   overflow: hidden;
 }
 
+/* The mobile navigation drawer locks page scroll with its OWN class, not
+   scroll-locked: a utility button inside the drawer (How to use) opens a
+   modal that sets scroll-locked, and closing the drawer must not undo
+   that lock. */
+body.nav-open {
+  overflow: hidden;
+}
+
+/* The page background lives on a fixed pseudo-element so the gradient
+   stays put while the page scrolls (background-attachment:fixed is
+   unreliable on iOS Safari). It sits behind everything, never intercepts
+   clicks, and is the one place the page background is defined.
+   Layers (top to bottom): tinted washes, the theme's artwork covering the
+   viewport, then the solid base colour. */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background:
+    var(--app-background),
+    var(--app-bg-image) var(--app-bg-position) / cover no-repeat,
+    var(--app-bg-solid);
+  pointer-events: none;
+}
+
 h1, h2, h3 { font-family: var(--font-head); margin: 0; }
 
 a { color: var(--primary); }
@@ -64,6 +216,12 @@ a { color: var(--primary); }
 
 button { font-family: inherit; cursor: pointer; }
 
+/* Safety net: an author `display` rule (flex/grid) otherwise beats the
+   browser's built-in [hidden], which has already bitten this project
+   several times (.overlay, .card-list, .other-detail-field). Views, the
+   drawer scrim and the welcome prompt all rely on `hidden`. */
+[hidden] { display: none !important; }
+
 /* Visible keyboard focus everywhere */
 :focus-visible {
   outline: 2px solid var(--primary);
@@ -71,28 +229,354 @@ button { font-family: inherit; cursor: pointer; }
 }
 
 /* =========================================================
-   Header
+   App shell — sidebar, top bar, views (v0.4)
+
+   Layout: [ floating sidebar ] [ top bar + main ]. The PAGE scrolls
+   (not an inner container), so body.scroll-locked keeps locking the
+   page for every modal. Fixed UI (overlays, popover, toast, the drawer
+   scrim) stays a direct child of <body>: backdrop-filter / contain on an
+   ancestor would make that ancestor the containing block for
+   position:fixed descendants and misplace them.
    ========================================================= */
-.app-header {
+.skip-link {
+  position: absolute;
+  left: 12px;
+  top: -56px;
+  z-index: 200;
+  padding: 10px 14px;
+  background: var(--surface-solid);
+  color: var(--accent);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-float);
+  font-weight: 600;
+  text-decoration: none;
+}
+.skip-link:focus { top: 12px; }
+
+.app-shell {
+  display: grid;
+  /* minmax(0, 1fr): without the 0 minimum a wide table could force the
+     content column (and the whole page) wider than the viewport. */
+  grid-template-columns: var(--sidebar-w) minmax(0, 1fr);
+  gap: var(--shell-gap);
+  padding: var(--shell-gap);
+  min-height: 100vh;
+  align-items: start;
+}
+
+.app-content { position: relative; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+
+.drawer-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: var(--scrim);
+}
+
+/* --- Sidebar --- */
+.sidebar {
+  position: sticky;
+  top: var(--shell-gap);
+  height: calc(100vh - (var(--shell-gap) * 2));
+  height: calc(100dvh - (var(--shell-gap) * 2));
+  z-index: 30;
   display: flex;
-  justify-content: space-between;
+  flex-direction: column;
+  gap: 18px;
+  padding: 18px 14px;
+  background: var(--surface-glass);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--glass-shadow);
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.sidebar__brand { display: flex; align-items: center; gap: 12px; padding: 4px 8px 8px; }
+
+/* The logo is a replaceable image. Nothing here depends on its artwork:
+   a fixed square slot, object-fit:contain, no tint/clip/shadow tied to
+   its shape. Swap assets/logo-mark.png (or change one src) and it fits. */
+.brand__mark {
+  flex: 0 0 auto;
+  width: var(--brand-mark-size);
+  height: var(--brand-mark-size);
+  display: flex;
   align-items: center;
-  gap: 16px;
-  flex-wrap: wrap;
-  padding: 20px clamp(16px, 4vw, 40px);
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
+  justify-content: center;
+  border-radius: var(--radius-md);
+  background: var(--brand-mark-plate);
+}
+.brand__mark img { display: block; width: 100%; height: 100%; object-fit: contain; }
+
+.brand__text { display: flex; flex-direction: column; min-width: 0; line-height: 1.2; }
+.brand__name { font-family: var(--font-head); font-weight: 700; font-size: 19px; color: var(--text-primary); }
+.brand__tag { font-size: 12px; color: var(--text-secondary); white-space: nowrap; }
+
+.sidebar__nav { display: flex; flex-direction: column; gap: 4px; }
+
+.nav-item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 11px 12px;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-secondary);
+  font-family: inherit;
+  font-size: 15px;
+  font-weight: 500;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+.nav-item svg {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.nav-item:hover { background: var(--accent-soft); color: var(--text-primary); }
+.nav-item.is-active { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.nav-item.is-active::before {
+  content: "";
+  position: absolute;
+  left: -14px;
+  top: 9px;
+  bottom: 9px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--accent);
 }
 
-.app-header__brand { display: flex; align-items: center; gap: 12px; }
+.nav-pill {
+  margin-left: auto;
+  padding: 2px 8px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface-glass-strong);
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 500;
+}
 
-.app-header__logo {
+.sidebar__footer {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 12px;
+  border-top: 1px solid var(--glass-border);
+}
+.sidebar__utilities { display: flex; flex-direction: column; gap: 4px; }
+
+.profile-chip {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+  padding: 10px;
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  background: var(--surface-glass-strong);
+  color: var(--text-primary);
+  text-decoration: none;
+}
+.profile-chip:hover { border-color: var(--accent); }
+.profile-chip__avatar {
+  flex: 0 0 auto;
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-family: var(--font-head);
+  font-weight: 700;
+  font-size: 15px;
+}
+.profile-chip__avatar svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.profile-chip__text { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
+.profile-chip__name {
+  font-size: 14px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.profile-chip__sub { font-size: 12px; color: var(--text-secondary); white-space: nowrap; }
+
+/* --- Top bar --- */
+/* Desktop: the top bar takes NO row of its own. It floats at the top-right of the content
+   column, on the same line as each page's heading (which keeps --topbar-reserve free for
+   it), so no empty bar is reserved. Any future top-bar control just joins this flex row.
+   Below the drawer breakpoint it goes back to a real, sticky [menu][title][+ Add] bar. */
+.topbar {
+  position: absolute;
+  top: 5px;
+  right: 0;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+}
+.topbar__menu {
+  display: none;
+  width: 40px;
   height: 40px;
-  width: auto;
-  display: block;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-md);
+  background: var(--surface-solid);
+  color: var(--text-primary);
+}
+.topbar__menu svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+}
+.topbar__title {
+  display: none;
+  flex: 1;
+  min-width: 0; /* lets the title shrink and ellipsize instead of pushing the Add button off a narrow phone */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--font-head);
+  font-weight: 600;
+  font-size: 17px;
 }
 
-.app-header__actions { display: flex; gap: 10px; }
+/* --- Main + views --- */
+/* The ONE definition of .app-main. It must always FILL the content column:
+   the views inside use container-type: inline-size, whose intrinsic width is 0,
+   so if this box ever sizes to its content (e.g. auto side margins on a flex
+   item) it collapses to just its padding and every view shrinks to a sliver. */
+.app-main {
+  width: 100%;
+  max-width: 1680px;
+  padding: 4px 0 60px;
+  outline: none;
+}
+
+.view__title {
+  margin: 4px 0 6px;
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.2;
+  outline: none; /* focus is moved here on navigation for screen readers; a ring on a heading is just noise */
+}
+.view__subtitle { margin: 0 0 22px; color: var(--text-secondary); }
+.view > .view__title,
+.view > .view__subtitle { padding-right: var(--topbar-reserve); }
+
+/* The two views whose layout depends on their own width (see Responsive).
+   Containment is safe here: no fixed-position UI lives inside a view. */
+#view-dashboard { container-type: inline-size; container-name: dashboard; }
+#view-applications { container-type: inline-size; container-name: apps; }
+
+.placeholder-card,
+.settings-card {
+  padding: 24px 26px;
+  background: var(--surface-glass);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--glass-shadow);
+}
+.placeholder-card { max-width: 640px; padding: 40px 28px; text-align: center; margin: 12px auto 0; }
+.placeholder-card h2 { font-size: 19px; margin: 12px 0 6px; }
+.placeholder-card p { margin: 0 auto; max-width: 46ch; color: var(--text-secondary); }
+.badge-soon {
+  display: inline-block;
+  padding: 3px 12px;
+  border-radius: 999px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.settings-grid { display: grid; gap: 16px; max-width: 720px; }
+.settings-card h2 { font-size: 17px; margin: 0 0 4px; }
+.settings-card__hint { margin: 0 0 16px; color: var(--text-secondary); font-size: 13.5px; }
+
+/* --- Appearance presets (Settings) --- */
+.theme-options { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; margin: 0; padding: 0; border: 0; }
+.theme-option { position: relative; display: block; cursor: pointer; }
+/* The real radio covers its card (so the whole card is the click target and it stays
+   keyboard-focusable); the card draws the selected state. */
+.theme-option__input { position: absolute; inset: 0; width: 100%; height: 100%; margin: 0; opacity: 0; cursor: pointer; }
+.theme-option__card {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+  border: 2px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-solid);
+}
+.theme-option:hover .theme-option__card { border-color: var(--border-strong); }
+.theme-option__input:checked + .theme-option__card { border-color: var(--accent); background: var(--accent-soft); }
+.theme-option__input:focus-visible + .theme-option__card { outline: 2px solid var(--accent); outline-offset: 2px; }
+.theme-option__name { display: block; font-weight: 600; }
+.theme-option__desc { display: block; font-size: 12.5px; color: var(--text-secondary); }
+.theme-option__check {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--on-accent);
+  opacity: 0;
+}
+.theme-option__input:checked + .theme-option__card .theme-option__check { opacity: 1; }
+.theme-option__check svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+
+/* The little preview always shows ITS theme, whichever theme is active (fixed preview tokens). */
+.theme-option__preview {
+  display: grid;
+  grid-template-columns: 14px 1fr;
+  grid-template-rows: 1fr 1fr;
+  gap: 4px;
+  width: 64px;
+  height: 44px;
+  padding: 5px;
+  border: 1px solid var(--p-line);
+  border-radius: 8px;
+  background: var(--p-bg);
+}
+.theme-option__preview i { display: block; border-radius: 3px; background: var(--p-panel); }
+.theme-option__preview i:nth-child(1) { grid-row: 1 / 3; }
+.theme-option__preview i:nth-child(2) { background: var(--p-accent); }
+.theme-option__preview--light { --p-bg: var(--preview-light-bg); --p-panel: var(--preview-light-panel); --p-accent: var(--preview-light-accent); --p-line: var(--preview-light-line); }
+.theme-option__preview--dark  { --p-bg: var(--preview-dark-bg);  --p-panel: var(--preview-dark-panel);  --p-accent: var(--preview-dark-accent);  --p-line: var(--preview-dark-line); }
+
+.settings-form { max-width: 420px; }
+.settings-form__actions { display: flex; align-items: center; gap: 8px; }
 
 /* =========================================================
    Buttons
@@ -110,7 +594,7 @@ button { font-family: inherit; cursor: pointer; }
   transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
 
-.btn--primary { background: var(--primary); color: #fff; }
+.btn--primary { background: var(--primary); color: var(--on-accent); }
 .btn--primary:hover { background: var(--primary-dark); }
 
 /* Scoped to .btn--current-disabled specifically (applied only when an
@@ -140,8 +624,8 @@ button { font-family: inherit; cursor: pointer; }
 .btn--text { background: transparent; color: var(--ink-soft); padding: 10px 12px; }
 .btn--text:hover { color: var(--ink); text-decoration: underline; }
 
-.btn--danger { background: var(--status-rejected-fg); color: #fff; }
-.btn--danger:hover { background: #8A2E24; }
+.btn--danger { background: var(--status-rejected-fg); color: var(--on-accent); }
+.btn--danger:hover { background: var(--danger-strong); }
 
 .icon-btn {
   background: transparent;
@@ -155,49 +639,230 @@ button { font-family: inherit; cursor: pointer; }
 
 /* =========================================================
    Main layout
+   .app-main is defined ONCE, in the "App shell" section near the top.
    ========================================================= */
-.app-main {
-  max-width: min(1600px, 94vw);
-  margin: 0 auto;
-  padding: 28px clamp(16px, 4vw, 40px) 80px;
-}
 
 /* =========================================================
    Summary cards
    ========================================================= */
+/* =========================================================
+   Dashboard (Stage 2): summary cards, recent applications, quick actions
+   The column layouts for .summary and .dash-grid are added by the
+   container queries in the Responsive section (they follow the view's
+   width, not the viewport's).
+   ========================================================= */
 .summary {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
-  gap: 12px;
-  margin-bottom: 24px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+  margin-bottom: 20px;
 }
 
 .summary-card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-left: 3px solid var(--ink-faint);
-  border-radius: var(--radius-sm);
-  padding: 14px 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+  /* Per-card accent: a soft tint behind the icon and the matching ink for
+     the icon and the percentage bar. A theme only has to redefine the
+     status tokens. */
+  --card-tint: var(--accent-soft);
+  --card-ink: var(--accent);
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-areas:
+    "icon text"
+    "meta meta";
+  align-content: center;
+  align-items: center;
+  column-gap: 14px;
+  row-gap: 14px;
+  padding: 18px;
+  background: var(--surface-glass);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--glass-shadow);
 }
 
-.summary-card--applied   { border-left-color: var(--status-applied-fg); }
-.summary-card--interview { border-left-color: var(--status-interview-fg); }
-.summary-card--offer     { border-left-color: var(--status-offer-fg); }
-.summary-card--rejected  { border-left-color: var(--status-rejected-fg); }
+.summary-card--applied   { --card-tint: var(--status-applied-bg);   --card-ink: var(--status-applied-fg); }
+.summary-card--interview { --card-tint: var(--status-interview-bg); --card-ink: var(--status-interview-fg); }
+.summary-card--offer     { --card-tint: var(--status-offer-bg);     --card-ink: var(--status-offer-fg); }
+.summary-card--rejected,
+.summary-card--failed    { --card-tint: var(--status-rejected-bg);  --card-ink: var(--status-rejected-fg); }
 
-.summary-card__label {
-  font-size: 12.5px;
-  color: var(--ink-soft);
+.summary-card__icon {
+  grid-area: icon;
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--card-tint);
+  color: var(--card-ink);
 }
 
+.summary-card__icon svg,
+.quick-action__tile svg,
+.dash-empty__icon svg {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.summary-card__text { grid-area: text; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.summary-card__label { font-size: 13.5px; line-height: 1.3; color: var(--text-secondary); }
 .summary-card__value {
   font-family: var(--font-head);
-  font-size: 26px;
-  font-weight: 600;
+  font-size: 32px;
+  font-weight: 700;
+  line-height: 1.1;
   font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+}
+
+.summary-card__meta { grid-area: meta; display: flex; flex-direction: column; gap: 8px; }
+.summary-card__pct { font-size: 12.5px; color: var(--text-secondary); }
+.summary-card__bar {
+  display: block;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--card-tint);
+  overflow: hidden;
+}
+.summary-card__bar > span {
+  display: block;
+  height: 100%;
+  width: var(--pct, 0%); /* set from js/dashboard.js: the same percentage as the text */
+  border-radius: inherit;
+  background: var(--card-ink);
+}
+
+.dash-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.dash-panel {
+  padding: 20px 22px;
+  background: var(--surface-glass);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--glass-shadow);
+}
+.dash-panel h2 { font-size: 18px; }
+/* flex-wrap: on a very narrow phone the title and the "View all" link can't share a line, so the link drops below the title instead of overflowing the panel. */
+.dash-panel__head { display: flex; flex-wrap: wrap; align-items: flex-start; justify-content: space-between; gap: 6px 12px; margin-bottom: 12px; }
+.dash-panel__sub { margin: 2px 0 0; font-size: 13px; color: var(--text-secondary); }
+
+.dash-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding-top: 2px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--accent);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.dash-link:hover { text-decoration: underline; }
+.dash-link svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+/* --- Recent applications --- */
+.dash-recent {
+  /* Its own container: the row layout depends on THIS panel's width, which
+     is narrower than the Dashboard whenever Quick Actions sits beside it. */
+  container-type: inline-size;
+  container-name: recent;
+  --recent-cols: minmax(0, 1.7fr) minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1.3fr) 112px;
+}
+.recent-head { display: none; }
+.recent-list { list-style: none; margin: 0; padding: 0; border-top: 1px solid var(--border); }
+.recent-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas:
+    "title   status"
+    "company match"
+    "date    match";
+  align-items: center;
+  column-gap: 12px;
+  row-gap: 2px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--border);
+}
+.recent-row:last-child { border-bottom: 0; padding-bottom: 2px; }
+.recent-row__title { grid-area: title; font-weight: 600; }
+.recent-row__company { grid-area: company; font-size: 13.5px; color: var(--text-secondary); }
+.recent-row__date { grid-area: date; font-size: 12.5px; color: var(--text-primary); }
+.recent-row__status { grid-area: status; justify-self: end; }
+.recent-row__match { grid-area: match; justify-self: end; }
+.recent-row__match .ai-match__breakdown-pct { font-size: 15px; }
+.recent-row__match .cell-ai-pending { font-size: 11.5px; white-space: nowrap; }
+.recent-row__title,
+.recent-row__company { overflow-wrap: anywhere; }
+/* Compact layout reads "Applied Sep 20, 2026": the label shows and the TIME is not shown.
+   (The wide layout does the opposite, see the @container recent rule below.) */
+.recent-row__applied { display: inline; }
+.recent-row__date .date-applied__time { display: none; }
+
+.dash-empty { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 28px 12px 12px; text-align: center; }
+.dash-empty__icon {
+  display: grid;
+  place-items: center;
+  width: 52px;
+  height: 52px;
+  margin-bottom: 6px;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.dash-empty__title { margin: 0; font-family: var(--font-head); font-size: 17px; font-weight: 600; }
+.dash-empty__text { margin: 0 0 12px; max-width: 38ch; color: var(--text-secondary); }
+
+/* --- Quick actions --- */
+.dash-quick h2 { margin-bottom: 10px; }
+.quick-list { display: flex; flex-direction: column; gap: 4px; }
+.quick-action {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 10px;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 14.5px;
+  font-weight: 600;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+.quick-action:hover { background: var(--bg); }
+.quick-action__tile {
+  flex: 0 0 auto;
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-md);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.quick-action__label { flex: 1 1 auto; min-width: 0; }
+.quick-action__chev { flex: 0 0 auto; display: grid; color: var(--text-muted); }
+.quick-action__chev svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 /* =========================================================
@@ -208,10 +873,11 @@ button { font-family: inherit; cursor: pointer; }
   flex-wrap: wrap;
   align-items: end;
   gap: 12px;
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-sm);
-  padding: 14px 16px;
+  background: var(--surface-glass);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--glass-shadow);
+  padding: 14px 18px;
   margin-bottom: 20px;
 }
 
@@ -245,18 +911,107 @@ button { font-family: inherit; cursor: pointer; }
 .search-clear-btn:hover { background: var(--border); color: var(--ink-soft); }
 
 .toolbar input[type="text"],
+.toolbar input[type="date"],
 .toolbar select {
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-sm);
   padding: 9px 10px;
   font-size: 14px;
-  background: #fff;
+  background: var(--surface-solid);
   color: var(--ink);
   min-width: 140px;
 }
 
 .toolbar input[type="text"]:focus,
+.toolbar input[type="date"]:focus,
 .toolbar select:focus { border-color: var(--primary); }
+
+/* --- Date range + Date applied sort (Applications toolbar) --- */
+.toolbar__field--date { flex: 0 1 152px; }
+.toolbar input[type="date"] { min-height: 40px; font-family: inherit; }
+.toolbar__label { font-size: 12.5px; color: var(--ink-soft); }
+.toolbar__field--sort { display: none; } /* shown only where the table has become cards, see Responsive */
+.toolbar__msg {
+  flex: 1 0 100%;
+  margin: 0;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--status-rejected-fg);
+}
+.toolbar input[aria-invalid="true"] { border-color: var(--status-rejected-fg); }
+
+.sort-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.sort-btn svg {
+  flex: 0 0 auto;
+  width: 14px;
+  height: 14px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  transition: transform 120ms ease;
+}
+.sort-btn[data-dir="asc"] svg { transform: rotate(180deg); }  /* down arrow = newest first, up arrow = oldest first */
+.sort-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.sort-btn--header {
+  margin: -4px -6px;
+  padding: 4px 6px;
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+}
+.sort-btn--header svg { color: var(--accent); }
+.sort-btn--header:hover { background: var(--accent-soft); color: var(--accent-strong); }
+.sort-btn--compact {
+  min-height: 40px;
+  padding: 9px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-solid);
+  color: var(--ink);
+  font-size: 14px;
+  white-space: nowrap;
+}
+.sort-btn--compact svg { color: var(--accent); }
+.sort-btn--compact:hover { border-color: var(--accent); }
+@media (prefers-reduced-motion: reduce) { .sort-btn svg { transition: none; } }
+
+/* --- Compact filters: toggle + collapsible panel (see Responsive for when they apply) --- */
+.toolbar__panel { display: contents; }       /* desktop: the wrapper is invisible to layout, controls stay in the toolbar row */
+.toolbar__compact-bar { display: none; }     /* desktop: no toggle (the controls are all visible) */
+.filters-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 40px;
+  padding: 9px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface-solid);
+  color: var(--ink);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.filters-toggle:hover { border-color: var(--accent); }
+.filters-toggle:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.filters-toggle svg { flex: 0 0 auto; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.filters-toggle__icon { width: 16px; height: 16px; color: var(--accent); }
+.filters-toggle__chev { width: 14px; height: 14px; transition: transform 120ms ease; }
+.filters-toggle[aria-expanded="true"] .filters-toggle__chev { transform: rotate(180deg); }
+.filters-toggle__count { margin-left: -4px; color: var(--accent); font-weight: 700; white-space: pre; }
+@media (prefers-reduced-motion: reduce) { .filters-toggle__chev { transition: none; } }
+
 
 /* =========================================================
    Empty state
@@ -264,9 +1019,9 @@ button { font-family: inherit; cursor: pointer; }
 .empty-state {
   text-align: center;
   padding: 56px 20px;
-  background: var(--surface);
+  background: var(--surface-glass-strong);
   border: 1px dashed var(--border-strong);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
 }
 
 .empty-state__title {
@@ -285,9 +1040,10 @@ button { font-family: inherit; cursor: pointer; }
    Ledger table (desktop)
    ========================================================= */
 .table-wrap {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
+  background: var(--surface-glass);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--glass-shadow);
   overflow-x: auto;
 }
 
@@ -401,7 +1157,7 @@ button { font-family: inherit; cursor: pointer; }
   background: var(--surface);
   border: 1px solid var(--border-strong);
   border-radius: var(--radius-md);
-  box-shadow: 0 8px 24px rgba(28, 36, 48, 0.18);
+  box-shadow: var(--shadow-popover);
   font-size: 12.5px;
   color: var(--ink);
   pointer-events: none;
@@ -444,18 +1200,32 @@ button { font-family: inherit; cursor: pointer; }
 .ledger__actions-col { text-align: right; }
 .ledger td.cell-actions { text-align: right; white-space: nowrap; }
 
+/* View / Edit / Delete: one soft-blue treatment for all three (no per-action colors).
+   Delete still goes through the existing confirmation. Used by the table and the cards. */
 .row-action {
-  background: transparent;
-  border: none;
-  color: var(--ink-soft);
-  font-size: 13px;
-  font-weight: 600;
-  padding: 6px 8px;
-  border-radius: var(--radius-sm);
+  display: inline-grid;
+  place-items: center;
+  width: 36px;
+  height: 34px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-md);
+  background: var(--accent-soft);
+  color: var(--accent);
+  cursor: pointer;
 }
-.row-action:hover { background: var(--primary-soft); color: var(--primary-dark); }
-.row-action:focus-visible { outline: 2px solid var(--primary); outline-offset: 1px; }
-.row-action--danger:hover { background: var(--status-rejected-bg); color: var(--status-rejected-fg); }
+.row-action svg {
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.row-action:hover { box-shadow: inset 0 0 0 1px var(--accent); }
+.row-action:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.ledger td.cell-actions .row-action + .row-action { margin-left: 6px; }
 
 /* =========================================================
    Status pill
@@ -481,62 +1251,63 @@ button { font-family: inherit; cursor: pointer; }
 .card-list { display: none; flex-direction: column; gap: 10px; }
 
 .app-card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
+  background: var(--surface-glass-strong);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-lg);
   padding: 14px 16px;
 }
 
+/* --- Compact application card (shown whenever the Applications view is too narrow for the table) ---
+   top:      Application ID | status
+   main:     job title + company | Overall Match
+   meta x2:  source, work arrangement, salary | applied date, client based
+   actions:  three equal buttons
+   Every text block wraps (overflow-wrap) so long titles, companies, salaries or client
+   locations can never overlap their neighbours. */
 .app-card__top {
   display: flex;
   justify-content: space-between;
-  align-items: start;
+  align-items: center;
   gap: 10px;
-  margin-bottom: 8px;
+  margin-bottom: 10px;
 }
+.app-card__top .status-pill { max-width: 70%; text-align: center; }
+.app-card__id { font-size: 12px; color: var(--text-secondary); }
 
-.app-card__id { font-size: 12px; color: var(--ink-faint); margin-bottom: 2px; }
-.app-card__title { font-weight: 600; font-size: 15px; }
-.app-card__company { color: var(--ink-soft); font-size: 13.5px; margin-top: 2px; }
+.app-card__main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  column-gap: 12px;
+  margin-bottom: 12px;
+}
+.app-card__title { font-weight: 600; font-size: 16px; line-height: 1.3; overflow-wrap: anywhere; }
+.app-card__company { margin-top: 2px; color: var(--text-secondary); font-size: 13.5px; overflow-wrap: anywhere; }
+.app-card__match { justify-self: end; text-align: right; }
+.app-card__match .ai-match__breakdown-pct { font-size: 18px; }
+.app-card__match .cell-ai-pending { font-size: 11.5px; white-space: nowrap; }
 
 .app-card__meta {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px 14px;
-  font-size: 13px;
-  color: var(--ink-soft);
-  margin-bottom: 10px;
-}
-
-.app-card__ai-summary {
-  display: flex;
-  align-items: center;
   justify-content: space-between;
-  gap: 10px;
-  padding: 10px;
-  background: var(--bg);
-  border-radius: var(--radius-sm);
-  margin-bottom: 10px;
+  gap: 4px 12px;
+  margin-bottom: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
 }
-.app-card__ai-label {
-  font-size: 10.5px;
-  font-weight: 600;
-  color: var(--ink-faint);
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
-}
-/* Touch screens have no hover, so say how to reach the breakdown. This
-   lives on the trigger itself, so it only appears when there IS a
-   breakdown to reach. */
-.app-card__ai-summary .match-trigger::after {
-  content: "Tap for breakdown";
-  margin-left: 8px;
-  font-size: 11px;
-  font-weight: 400;
-  color: var(--ink-faint);
-}
+.app-card__meta > span { min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
+.app-card__meta > span:nth-child(2):not(:last-child) { text-align: center; }
+.app-card__meta > span:last-child { text-align: right; }
 
-.app-card__actions { display: flex; gap: 6px; }
+.app-card__actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+.app-card__actions .row-action { width: 100%; height: 40px; }
 
 /* =========================================================
    Overlay / side panel
@@ -544,7 +1315,7 @@ button { font-family: inherit; cursor: pointer; }
 .overlay {
   position: fixed;
   inset: 0;
-  background: rgba(28, 36, 48, 0.45);
+  background: var(--scrim);
   display: flex;
   justify-content: flex-end;
   z-index: 50;
@@ -564,7 +1335,7 @@ button { font-family: inherit; cursor: pointer; }
   display: flex;
   flex-direction: column;
   position: relative; /* anchors .go-to-top-btn's absolute positioning in the details panel */
-  box-shadow: -8px 0 24px rgba(28, 36, 48, 0.08);
+  box-shadow: var(--shadow-panel);
 }
 
 /* Application Details AND the Add/Edit form both get this wider desktop
@@ -655,7 +1426,7 @@ button { font-family: inherit; cursor: pointer; }
   border-radius: 50%;
   font-size: 16px;
   line-height: 1;
-  box-shadow: 0 2px 8px rgba(28, 36, 48, 0.12);
+  box-shadow: var(--shadow-float);
   cursor: pointer;
   z-index: 5;
 }
@@ -792,7 +1563,7 @@ button { font-family: inherit; cursor: pointer; }
   font-size: 14px;
   font-family: inherit;
   color: var(--ink);
-  background: #fff;
+  background: var(--surface-solid);
 }
 
 .field textarea { resize: vertical; }
@@ -943,7 +1714,7 @@ button { font-family: inherit; cursor: pointer; }
   left: 50%;
   transform: translateX(-50%);
   background: var(--ink);
-  color: #fff;
+  color: var(--text-inverse);
   padding: 12px 20px;
   border-radius: var(--radius-sm);
   font-size: 14px;
@@ -1189,8 +1960,8 @@ button { font-family: inherit; cursor: pointer; }
 .ai-match__spinner {
   width: 14px;
   height: 14px;
-  border: 2px solid rgba(255, 255, 255, 0.4);
-  border-top-color: #fff;
+  border: 2px solid var(--on-accent-track);
+  border-top-color: var(--on-accent);
   border-radius: 50%;
   animation: ai-match-spin 0.7s linear infinite;
 }
@@ -1202,7 +1973,7 @@ button { font-family: inherit; cursor: pointer; }
 .ai-match__check {
   font-size: 14px;
   line-height: 1;
-  color: #fff;
+  color: var(--on-accent);
 }
 
 .ai-match__current-notice {
@@ -1289,25 +2060,219 @@ button { font-family: inherit; cursor: pointer; }
 /* =========================================================
    Responsive
    ========================================================= */
-@media (max-width: 860px) {
-  .summary { grid-template-columns: repeat(2, 1fr); }
+/* =========================================================
+   Glass effect (shared)
+   Only a handful of LARGE surfaces get a backdrop blur — never table
+   rows, list items, modals or panels (cost, and readability). Their
+   translucent background/border/shadow come from the tokens above.
+   ========================================================= */
+.sidebar,
+.summary-card,
+.dash-panel,
+.toolbar,
+.table-wrap,
+.placeholder-card,
+.settings-card {
+  -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(140%);
+  backdrop-filter: blur(var(--glass-blur)) saturate(140%);
+}
+/* No backdrop-filter support: fall back to the more opaque glass so text
+   stays readable instead of sitting on a see-through panel. */
+@supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+  .sidebar,
+  .summary-card,
+  .dash-panel,
+  .toolbar,
+  .table-wrap,
+  .placeholder-card,
+  .settings-card {
+    background: var(--surface-glass-strong);
+  }
 }
 
-@media (max-width: 760px) {
+/* =========================================================
+   Responsive
+   ========================================================= */
+
+/* --- Content-width layout (container queries) -------------------------
+   How much room a view gets depends on the sidebar tier, so the table/
+   cards switch and the Dashboard layouts follow the VIEW's width, not the
+   viewport. TUNE THESE NUMBERS in a real browser:
+     1360px — MEASURED: the 11-column table needs ~1319-1333px (the 36px action buttons made the
+              Actions column 152px), so it only shows from 1360px of content width up
+              (~27px of headroom). The wide-sidebar tier starts at 1680px so that expanding the
+              sidebar leaves the content column at 1372px, still above this threshold.
+     Dashboard summary cards:  1 column < 340 | 2 columns 340+ | 3 x 2 at 720+ | one row of 6 at 1330+
+                               (measured: a card needs ~208px to keep "Total Applications" on one line,
+                                so six in a row need ~1328px of content width)
+     Dashboard lower section:  Quick Actions sits beside Recent Applications at 980+
+     Recent Applications:      table-like row at 640+ (the panel's own width)    */
+@container apps (max-width: 1359px) {
   .table-wrap { display: none; }
   .card-list { display: flex; }
   .card-list[hidden] { display: none; }
+  .toolbar__field--sort { display: flex; }
+  /* Compact filter bar: Search on top, then [Filters] [sort], then (only when opened) the panel. */
+  .toolbar { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; padding: 12px; margin-bottom: 14px; }
+  .toolbar__compact-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  .toolbar__panel {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+  }
+  .toolbar__panel.is-collapsed { display: none; }  /* collapsed: hidden from view AND the tab order; values are kept */
+  .toolbar__panel .toolbar__field { min-width: 0; }
+  .toolbar__panel input[type="date"],
+  .toolbar__panel select { width: 100%; min-width: 0; text-overflow: ellipsis; }
+  .toolbar__panel > .toolbar__field:nth-child(3) { grid-column: 1 / -1; }   /* Status: the full row */
+  .toolbar__panel #resetFiltersBtn { grid-column: 1 / -1; justify-self: end; }
+}
+/* The two dates sit side by side only where each keeps its ~148px natural width: below a 332px content
+   width (a 320px phone) they stack instead. Source + Work arrangement stay paired (selects shrink). */
+@container apps (max-width: 331px) {
+  .toolbar__panel .toolbar__field--date { grid-column: 1 / -1; }
+}
+@container dashboard (min-width: 340px)  { .summary { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@container dashboard (min-width: 720px)  { .summary { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@container dashboard (min-width: 1330px) { .summary { grid-template-columns: repeat(6, minmax(0, 1fr)); } }
+@container dashboard (min-width: 980px)  { .dash-grid { grid-template-columns: minmax(0, 1fr) 320px; } }
+/* Recent Applications switches from a stacked row to one table-like row
+   based on ITS OWN width. */
+@container recent (min-width: 640px) {
+  .recent-head,
+  .recent-row { display: grid; grid-template-columns: var(--recent-cols); column-gap: 14px; }
+  .recent-head {
+    padding: 4px 0 10px;
+    font-size: 11.5px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--text-secondary);
+  }
+  .recent-row { grid-template-areas: "title company date status match"; padding: 14px 0; }
+  .recent-row__status,
+  .recent-row__match { justify-self: start; }
+  .recent-row__date .date-applied__time { display: block; margin-left: 0; font-size: 12px; }
+  .recent-row__applied { display: none; }
+}
+/* Browsers without container queries: approximate with the viewport. */
+@supports not (container-type: inline-size) {
+  @media (max-width: 1495px) {
+    .table-wrap { display: none; }
+    .card-list { display: flex; }
+    .card-list[hidden] { display: none; }
+    .toolbar__field--sort { display: flex; }
+    /* Compact filter bar: Search on top, then [Filters] [sort], then (only when opened) the panel. */
+    .toolbar { display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; padding: 12px; margin-bottom: 14px; }
+    .toolbar__compact-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+    .toolbar__panel {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+      padding-top: 12px;
+      border-top: 1px solid var(--border);
+    }
+    .toolbar__panel.is-collapsed { display: none; }  /* collapsed: hidden from view AND the tab order; values are kept */
+    .toolbar__panel .toolbar__field { min-width: 0; }
+    .toolbar__panel input[type="date"],
+    .toolbar__panel select { width: 100%; min-width: 0; text-overflow: ellipsis; }
+    .toolbar__panel > .toolbar__field:nth-child(3) { grid-column: 1 / -1; }   /* Status: the full row */
+    .toolbar__panel #resetFiltersBtn { grid-column: 1 / -1; justify-self: end; }
+  }
+  @media (max-width: 355px) {
+    .toolbar__panel .toolbar__field--date { grid-column: 1 / -1; }
+  }
+  @media (min-width: 420px)  { .summary { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+  @media (min-width: 900px)  { .summary { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+  @media (min-width: 1640px) { .summary { grid-template-columns: repeat(6, minmax(0, 1fr)); } }
+  @media (min-width: 1300px) { .dash-grid { grid-template-columns: minmax(0, 1fr) 320px; } }
+}
+
+/* --- Navigation tiers ---------------------------------------------------
+   Wide sidebar (>= 1680px) | icon rail (1100-1679px) | drawer (< 1100px).
+   TUNE in a real browser. The drawer breakpoint (1099/1100) is ALSO a
+   constant, DRAWER_QUERY, in js/shell.js — keep the two in sync.        */
+@media (min-width: 1100px) and (max-width: 1679px) {
+  :root { --sidebar-w: 76px; }
+  .sidebar { padding: 18px 10px; }
+  .sidebar__brand { justify-content: center; padding: 4px 0 8px; }
+  .nav-item { justify-content: center; padding: 12px 0; }
+  .nav-item.is-active::before { left: -10px; }
+  .profile-chip { justify-content: center; padding: 8px; }
+  /* Labels stay in the DOM for screen readers, just not visible. */
+  .brand__text,
+  .nav-item__label,
+  .nav-pill,
+  .profile-chip__text {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+  }
+}
+
+@media (max-width: 1099px) {
+  .app-shell { grid-template-columns: minmax(0, 1fr); gap: 12px; padding: 12px; }
+
+  /* Sidebar becomes an off-canvas drawer. visibility:hidden while closed
+     keeps its links out of the tab order. */
+  .sidebar {
+    position: fixed;
+    top: 12px;
+    bottom: 12px;
+    left: 12px;
+    height: auto;
+    width: min(300px, calc(100vw - 24px));
+    z-index: 41;
+    background: var(--surface-glass-strong);
+    transform: translateX(calc(-100% - 24px));
+    visibility: hidden;
+    transition: transform 200ms ease, visibility 0s linear 200ms;
+  }
+  .sidebar.is-open {
+    transform: none;
+    visibility: visible;
+    transition: transform 200ms ease, visibility 0s;
+  }
+
+  .topbar {
+    position: sticky;
+    top: 8px;
+    right: auto;
+    z-index: 20;
+    padding: 8px 10px;
+    background: var(--surface-glass-strong);
+    border: 1px solid var(--glass-border);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--glass-shadow);
+    -webkit-backdrop-filter: blur(var(--glass-blur)) saturate(140%);
+    backdrop-filter: blur(var(--glass-blur)) saturate(140%);
+  }
+  .topbar__menu { display: inline-flex; }
+  .topbar__title { display: block; }
+  .view__title { font-size: 24px; }
+  .view > .view__title,
+  .view > .view__subtitle { padding-right: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebar,
+  .sidebar.is-open { transition: none; }
+}
+
+@media (max-width: 760px) {
   #detailsOverlay .panel,
   #formOverlay .panel { width: 100%; }
   .how-to-use__steps { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 520px) {
-  .app-header__actions { width: 100%; flex-wrap: wrap; }
-  .app-header__actions .btn { flex: 1 1 auto; min-width: 100px; }
   .field-row { grid-template-columns: 1fr; }
   .detail-grid { grid-template-columns: 1fr; }
-  .summary { grid-template-columns: 1fr 1fr; }
   .ai-match__resume-row { flex-direction: column; align-items: stretch; }
   .ai-match__resume-actions { justify-content: flex-end; }
 }
