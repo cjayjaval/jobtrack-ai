@@ -43,6 +43,7 @@
     welcomeInput: $("welcomeNameInput"),
     welcomeError: $("welcomeError"),
     welcomeSkip: $("welcomeSkipBtn"),
+    backToTop: $("backToTopBtn"),
   };
 
   if (!el.sidebar || !el.main) {
@@ -99,11 +100,27 @@
     closeDrawer(false);
     if (typeof hidePopover === "function") hidePopover();
 
+    // v0.4.1: Dashboard/Applications can each scroll inside their own box on
+    // desktop (see style.css, "Desktop scroll containment") — reset that
+    // along with the page scroll, so switching views never lands mid-scroll
+    // on a list left over from a previous visit.
+    resetViewScroll($(ROUTES[route].viewId));
+    updateBackToTopVisibility();
+
     if (opts.moveFocus) {
       window.scrollTo(0, 0);
       const heading = $(ROUTES[route].viewId).querySelector(".view__title");
       if (heading) heading.focus({ preventScroll: true });
     }
+  }
+
+  /** Resets a view's own scroll container(s) to the top — see showRoute() above. */
+  function resetViewScroll(view) {
+    if (!view) return;
+    view.scrollTop = 0;
+    view.querySelectorAll(".dash-scroll, .view__frame, .table-wrap").forEach((node) => {
+      node.scrollTop = 0;
+    });
   }
 
   /** Shows the view for the current hash; an empty/unknown hash becomes #dashboard without adding a history entry. */
@@ -208,6 +225,39 @@
       event.preventDefault();
       el.main.focus();
     });
+  }
+
+  /* ---------------------------------------------------------
+     v0.4.1. BACK TO TOP (mobile)
+
+     Floating button shown only on Dashboard/Applications, only after
+     scrolling the PAGE some meaningful distance, and only below the
+     min-width:1100px tier (style.css hard-hides it on desktop too, as a
+     safety net in case a resize is missed). Mirrors the existing
+     "go to top" control in script.js (updateGoToTopVisibility), but for
+     the page itself rather than the Application Details panel.
+     --------------------------------------------------------- */
+
+  const BACK_TO_TOP_SHOW_THRESHOLD_PX = 400;
+  const BACK_TO_TOP_ROUTES = { dashboard: true, applications: true };
+
+  function updateBackToTopVisibility() {
+    if (!el.backToTop) return;
+    const route = routeFromHash() || DEFAULT_ROUTE;
+    const relevant = !!BACK_TO_TOP_ROUTES[route];
+    const scrolledDown = window.scrollY > BACK_TO_TOP_SHOW_THRESHOLD_PX;
+    el.backToTop.hidden = !(relevant && scrolledDown);
+  }
+
+  function wireBackToTop() {
+    if (!el.backToTop) return;
+    el.backToTop.addEventListener("click", () => {
+      const reduceMotion = typeof window.matchMedia === "function"
+        && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      window.scrollTo({ top: 0, behavior: reduceMotion ? "auto" : "smooth" });
+    });
+    window.addEventListener("scroll", updateBackToTopVisibility, { passive: true });
+    window.addEventListener("resize", updateBackToTopVisibility);
   }
 
   /* ---------------------------------------------------------
@@ -430,6 +480,7 @@
      --------------------------------------------------------- */
 
   wireNavigation();
+  wireBackToTop();
   wireProfile();
   wireWelcome();
   applyProfileToUI();

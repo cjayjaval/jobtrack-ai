@@ -489,8 +489,10 @@ button { font-family: inherit; cursor: pointer; }
   outline: none; /* focus is moved here on navigation for screen readers; a ring on a heading is just noise */
 }
 .view__subtitle { margin: 0 0 22px; color: var(--text-secondary); }
-.view > .view__title,
-.view > .view__subtitle { padding-right: var(--topbar-reserve); }
+/* Descendant selector (not a direct-child one): v0.4.1 nests the Applications
+   heading/subtitle one level deeper, inside .view__frame (see Responsive). */
+.view__title,
+.view__subtitle { padding-right: var(--topbar-reserve); }
 
 /* The two views whose layout depends on their own width (see Responsive).
    Containment is safe here: no fixed-position UI lives inside a view. */
@@ -1449,6 +1451,42 @@ button { font-family: inherit; cursor: pointer; }
 }
 
 /* =========================================================
+   v0.4.1 — Back to top (mobile)
+   Floating, bottom-right; mirrors .go-to-top-btn's styling above but
+   scrolls the whole page instead of a panel's own scroll area. Shown and
+   hidden by js/shell.js based on scroll position and the active route
+   (Dashboard/Applications only); hard-hidden on desktop by the
+   min-width:1100px rule alongside the scroll-containment rules
+   (Responsive), so it can never appear there even if a resize is missed.
+   ========================================================= */
+.back-to-top-btn {
+  position: fixed;
+  right: var(--shell-gap);
+  bottom: 20px;
+  z-index: 15; /* above page content; below the drawer scrim (40) / drawer (41) / overlays (50+) */
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface-glass-strong);
+  color: var(--text-primary);
+  border: 1px solid var(--glass-border);
+  border-radius: 50%;
+  font-size: 18px;
+  line-height: 1;
+  box-shadow: var(--glass-shadow);
+  cursor: pointer;
+}
+.back-to-top-btn:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.back-to-top-btn[hidden] {
+  display: none;
+}
+
+/* =========================================================
    Form
    ========================================================= */
 .form-section { margin-bottom: 22px; }
@@ -2091,6 +2129,87 @@ button { font-family: inherit; cursor: pointer; }
 }
 
 /* =========================================================
+   v0.4.1 — Desktop scroll containment (Dashboard + Applications)
+
+   Pins the heading (and, for Applications, the toolbar) while only the
+   content below scrolls. Gated at min-width:1100px, the same tier where
+   the sidebar itself becomes sticky/bounded, using the SAME height
+   formula (100dvh minus the shell's top+bottom padding) minus .app-main's
+   own 4px/60px padding, so no extra page-level scrollbar appears
+   alongside this. overflow-y:auto on the bounded element itself is a
+   safety net for unusually short viewports, not the primary scrollbar —
+   it should stay inert whenever the inner flex split below has room.
+
+   Applications specifically needs an extra wrapper (.view__frame) rather
+   than bounding #view-applications directly: the table-vs-cards switch is
+   driven by the `apps` container query below, and a container can't query
+   its own size — only a DESCENDANT of #view-applications can react to it.
+   Below 1360px of content width (cards layout — including at desktop
+   viewport widths, where a narrower sidebar leaves less room) .view__frame
+   stays a plain, unstyled div and the view scrolls with the page exactly
+   as before, search/filters/sort included.
+
+   NOTE for future maintainers: a sticky/fixed toolbar in that cards case
+   was tried and reverted. #view-applications's container-type:inline-size
+   (needed for the table/card query above) makes it establish containment
+   that silently breaks position:sticky/fixed for EVERY descendant trying
+   to stick to the real viewport — confirmed in Chromium, Firefox and
+   WebKit. A sticky element in there sticks to #view-applications itself,
+   which just scrolls normally with the page, so it isn't stuck at all.
+   ========================================================= */
+@media (min-width: 1100px) {
+  #view-dashboard {
+    height: calc(100vh - (var(--shell-gap) * 2) - 4px - 60px);
+    height: calc(100dvh - (var(--shell-gap) * 2) - 4px - 60px);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+  }
+  #view-dashboard > .view__title,
+  #view-dashboard > .view__subtitle { flex: none; }
+  .dash-scroll { flex: 1; min-height: 0; overflow-y: auto; }
+
+  /* Back to top is a mobile affordance only (see Buttons, above). */
+  .back-to-top-btn { display: none; }
+}
+
+@container apps (min-width: 1360px) {
+  .view__frame {
+    height: calc(100vh - (var(--shell-gap) * 2) - 4px - 60px);
+    height: calc(100dvh - (var(--shell-gap) * 2) - 4px - 60px);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+  }
+  .view__frame > .view__title,
+  .view__frame > .view__subtitle,
+  .view__frame > .toolbar { flex: none; }
+  .view__frame > .list-section {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+  .view__frame > .list-section > .table-wrap {
+    flex: 1;
+    min-height: 0;
+    overflow-y: auto; /* in addition to the existing overflow-x: auto below */
+  }
+  .ledger thead th {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    background: var(--surface-glass-strong);
+  }
+}
+/* This table-scroll-isolation refinement is intentionally NOT mirrored into
+   the "@supports not (container-type: inline-size)" fallback further down:
+   legacy browsers without container-query support simply keep today's
+   full-page scroll for Applications — safe, unbroken, just without this
+   enhancement. */
+
+/* =========================================================
    Responsive
    ========================================================= */
 
@@ -2255,8 +2374,23 @@ button { font-family: inherit; cursor: pointer; }
   .topbar__menu { display: inline-flex; }
   .topbar__title { display: block; }
   .view__title { font-size: 24px; }
-  .view > .view__title,
-  .view > .view__subtitle { padding-right: 0; }
+  .view__title,
+  .view__subtitle { padding-right: 0; }
+
+  /* v0.4.1: the Applications heading/subtitle duplicate the mobile top
+     bar's title, so they're visually hidden here — NOT display:none,
+     since js/shell.js moves focus to .view__title on route change and a
+     display:none element can't receive focus. Same technique as the
+     icon-rail tier's nav labels above. */
+  #view-applications .view__title,
+  #view-applications .view__subtitle {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {

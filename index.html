@@ -69,6 +69,12 @@
           <h1 class="view__title" id="dashboardHeading" tabindex="-1"><span id="greetingText">Welcome</span></h1>
           <p class="view__subtitle">Here's your job search overview.</p>
 
+          <!-- v0.4.1: everything below the heading lives in its own scroll
+               region on desktop (see .dash-scroll in style.css), so the
+               greeting and Add Application button stay visible while this
+               scrolls. Purely structural — no ids changed, so dashboard.js
+               and script.js are unaffected. -->
+          <div class="dash-scroll">
           <!-- Summary cards. The five original stat ids are kept on the value elements: script.js
                still fills them (its renderSummary is untouched). js/dashboard.js adds Rejected and
                the "% of total" lines. -->
@@ -172,10 +178,20 @@
               </div>
             </section>
           </div>
+          </div>
         </section>
 
         <!-- ===== Applications view (the existing application workflow, unchanged) ===== -->
         <section class="view" id="view-applications" data-view="applications" aria-labelledby="applicationsHeading" hidden>
+          <!-- v0.4.1: .view__frame only becomes a bounded, independently-
+               scrolling box when the table layout is active (see the
+               `@container apps (min-width: 1360px)` rules in style.css) —
+               it has to be a separate element from #view-applications
+               itself, since a container can't query its own size. Below
+               that width (cards layout, including narrower desktop
+               sidebars) it is inert and this view scrolls with the page,
+               exactly as before. -->
+          <div class="view__frame">
           <h1 class="view__title" id="applicationsHeading" tabindex="-1">Applications</h1>
           <p class="view__subtitle">Track, search and manage every application.</p>
 
@@ -290,6 +306,7 @@
       </div>
 
     </section>
+          </div>
         </section>
 
         <!-- ===== Analytics view (placeholder) ===== -->
@@ -369,6 +386,11 @@
       </main>
     </div>
   </div>
+
+  <!-- v0.4.1: mobile-only, shown on Dashboard/Applications after scrolling (js/shell.js).
+       A direct child of <body>, like the overlays/toast below, so it's never affected by
+       overflow/positioning on an ancestor. -->
+  <button type="button" class="back-to-top-btn" id="backToTopBtn" aria-label="Back to top" title="Back to top" hidden>↑</button>
 
   <!-- ===== Add / Edit panel ===== -->
   <div class="overlay" id="formOverlay" hidden>

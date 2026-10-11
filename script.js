@@ -16,7 +16,7 @@
 const STORAGE_KEY = "jobtrackai_applications";
 
 // Current app version, included in JSON exports to prepare for a future import feature.
-const APP_VERSION = "0.3.0";
+const APP_VERSION = "0.4.1";
 
 // The full list of statuses, in the order they should progress.
 const STATUSES = [
