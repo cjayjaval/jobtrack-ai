@@ -16,7 +16,7 @@
 const STORAGE_KEY = "jobtrackai_applications";
 
 // Current app version, included in JSON exports to prepare for a future import feature.
-const APP_VERSION = "0.4.1";
+const APP_VERSION = "0.4.2";
 
 // The full list of statuses, in the order they should progress.
 const STATUSES = [
@@ -199,6 +199,8 @@ const els = {
   howToUseBtn: document.getElementById("howToUseBtn"),
   howToUseOverlay: document.getElementById("howToUseOverlay"),
   closeHowToUseBtn: document.getElementById("closeHowToUseBtn"),
+  howToUseVideo: document.getElementById("howToUseVideo"),
+  howToUseTrack: document.getElementById("howToUseTrack"),
 
   // summary
   statTotal: document.getElementById("statTotal"),
@@ -1358,11 +1360,44 @@ function unlockBodyScroll() {
 function openHowToUse() {
   els.howToUseOverlay.hidden = false;
   lockBodyScroll();
+  loadHowToUseVideo();
 }
 
 function closeHowToUse() {
   els.howToUseOverlay.hidden = true;
   unlockBodyScroll();
+  resetHowToUseVideo();
+}
+
+/**
+ * Points the How to Use video (and its subtitle track) at their real files
+ * the first time the modal is opened, so nothing is fetched before then.
+ * Safe to call on every open — a no-op once the src is already set.
+ */
+function loadHowToUseVideo() {
+  const video = els.howToUseVideo;
+  if (!video || video.src) return;
+  const track = els.howToUseTrack;
+  if (track && track.dataset.src) {
+    track.src = track.dataset.src;
+    delete track.dataset.src;
+  }
+  video.src = "assets/how-to-use.mp4";
+  video.load();
+}
+
+/**
+ * Pauses playback and rewinds to the start, so reopening the modal always
+ * begins from 0:00 without auto-playing. Called from the single
+ * closeHowToUse() path (button, Escape, and backdrop click all route
+ * through it — see the overlay click handler below), so this is the one
+ * place playback gets stopped.
+ */
+function resetHowToUseVideo() {
+  const video = els.howToUseVideo;
+  if (!video || !video.src) return;
+  video.pause();
+  video.currentTime = 0;
 }
 
 function confirmDelete() {
@@ -1735,12 +1770,16 @@ function attachEventListeners() {
   // button (or Cancel) is the only way to dismiss that one.
   [els.detailsOverlay, els.deleteOverlay, els.howToUseOverlay].forEach((overlay) => {
     overlay.addEventListener("click", (event) => {
-      if (event.target === overlay) {
-        overlay.hidden = true;
-        if (overlay === els.deleteOverlay) pendingDeleteId = null;
-        if (overlay === els.detailsOverlay) currentDetailsId = null;
-        if (overlay === els.howToUseOverlay) unlockBodyScroll();
+      if (event.target !== overlay) return;
+      // How to Use routes through closeHowToUse() like the ✕ button and Escape,
+      // so pausing/resetting the video lives in exactly one place.
+      if (overlay === els.howToUseOverlay) {
+        closeHowToUse();
+        return;
       }
+      overlay.hidden = true;
+      if (overlay === els.deleteOverlay) pendingDeleteId = null;
+      if (overlay === els.detailsOverlay) currentDetailsId = null;
     });
   });
 

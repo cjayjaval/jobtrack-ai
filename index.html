@@ -664,6 +664,13 @@
         <button type="button" class="icon-btn" id="closeHowToUseBtn" aria-label="Close">✕</button>
       </div>
       <div class="how-to-use__body">
+        <!-- Lazy-loaded: no src until the modal is opened (script.js, loadHowToUseVideo()),
+             so the video is never fetched on initial page load. The subtitle track is optional
+             through the native CC control — no `default` attribute, so it starts off. -->
+        <video id="howToUseVideo" class="how-to-use__video" controls playsinline preload="none"
+               aria-label="JobTrack AI walkthrough video">
+          <track id="howToUseTrack" kind="subtitles" srclang="en" label="English" data-src="assets/how-to-use.vtt">
+        </video>
         <ol class="how-to-use__steps">
           <li class="how-to-use__step">
             <span class="how-to-use__step-number">1</span>
