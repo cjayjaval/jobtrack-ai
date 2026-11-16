@@ -16,7 +16,7 @@
 const STORAGE_KEY = "jobtrackai_applications";
 
 // Current app version, included in JSON exports to prepare for a future import feature.
-const APP_VERSION = "0.4.2";
+const APP_VERSION = "0.4.3";
 
 // The full list of statuses, in the order they should progress.
 const STATUSES = [
@@ -185,8 +185,77 @@ function migrateLegacyStatuses(apps) {
   return migrated;
 }
 
+/**
+ * One-time data migration: any application currently "Applied" that
+ * predates the Auto-Ghosted feature (no appliedSince yet) gets its
+ * countdown reference backfilled from its own Application Date — the
+ * same rule a brand-new "Applied" application gets at creation (see
+ * handleFormSubmit). Safe to run on every load: only touches applications
+ * missing the field, so one that's already been through this (or through
+ * a real manual transition into Applied) is left untouched. An app with
+ * no dateApplied either is left alone rather than guessed at.
+ */
+function backfillAppliedSince(apps) {
+  let didMigrate = false;
+  const migrated = apps.map((app) => {
+    if (app.status === "Applied" && !app.appliedSince && app.dateApplied) {
+      didMigrate = true;
+      return { ...app, appliedSince: app.dateApplied };
+    }
+    return app;
+  });
+  if (didMigrate) saveApplications(migrated);
+  return migrated;
+}
+
 // In-memory copy of the applications, kept in sync with localStorage.
-let applications = migrateLegacyStatuses(loadApplications());
+let applications = backfillAppliedSince(migrateLegacyStatuses(loadApplications()));
+
+/**
+ * Whole calendar days from `isoA` to `isoB` ("YYYY-MM-DD" strings), computed
+ * via Date.UTC on each date's own year/month/day so the result is an exact
+ * integer regardless of the LOCAL calendar's own DST transitions — the two
+ * dates are never turned into real instants in the user's timezone, just
+ * compared as abstract calendar dates. Returns null if either isn't a
+ * plain ISO date.
+ */
+function daysBetweenCalendarDates(isoA, isoB) {
+  const a = isoDateOrEmpty(isoA);
+  const b = isoDateOrEmpty(isoB);
+  if (!a || !b) return null;
+  const [ay, am, ad] = a.split("-").map(Number);
+  const [by, bm, bd] = b.split("-").map(Number);
+  const MS_PER_DAY = 24 * 60 * 60 * 1000;
+  return Math.round((Date.UTC(by, bm - 1, bd) - Date.UTC(ay, am - 1, ad)) / MS_PER_DAY);
+}
+
+/**
+ * Automatically moves any application still "Applied" 14+ calendar days
+ * after its most recent entry into Applied (app.appliedSince — see
+ * handleFormSubmit for when that gets set/restarted) to "Ghosted", and
+ * persists the change. Only ever touches status and updatedAt — dateApplied
+ * and appliedSince itself are never rewritten here. An application in any
+ * other status, or with a missing/invalid appliedSince, is left exactly as
+ * it is. Called from renderAll(), so it runs on page load and after every
+ * create/edit/delete — never on a mere filter/sort/search re-render, since
+ * those call renderList() directly instead.
+ */
+function applyAutoGhostedStatuses() {
+  const today = toLocalDateString(new Date());
+  let changed = false;
+  const updated = applications.map((app) => {
+    if (app.status !== "Applied") return app;
+    const reference = isoDateOrEmpty(app.appliedSince);
+    if (!reference) return app;
+    const elapsed = daysBetweenCalendarDates(reference, today);
+    if (elapsed === null || elapsed < 14) return app;
+    changed = true;
+    return { ...app, status: "Ghosted", updatedAt: new Date().toISOString() };
+  });
+  if (!changed) return;
+  const saved = saveApplications(updated);
+  if (saved) applications = updated;
+}
 
 /* ---------------------------------------------------------
    2. DOM REFERENCES
@@ -217,6 +286,7 @@ const els = {
   filterDateFrom: document.getElementById("filterDateFrom"),
   filterDateTo: document.getElementById("filterDateTo"),
   filterWorkArrangement: document.getElementById("filterWorkArrangement"),
+  filterFavorites: document.getElementById("filterFavorites"),
   filterPanel: document.getElementById("filterPanel"),
   filtersToggleBtn: document.getElementById("filtersToggleBtn"),
   filtersCount: document.getElementById("filtersCount"),
@@ -409,6 +479,7 @@ function populateSelect(selectEl, values, placeholderText) {
 
 /** Re-renders the summary cards, the list, and the empty state. */
 function renderAll() {
+  applyAutoGhostedStatuses();
   renderSummary();
   renderList();
 }
@@ -556,16 +627,17 @@ function syncDateSortControls() {
 
 /**
  * How many filters inside the collapsible panel are active: Date range (From and/or To
- * together = ONE), Status, Source, Work arrangement. Search is always visible and the
- * Date applied sort is not a filter, so neither counts. "All" is inactive. It reads the
- * range the list actually uses, so it always agrees with the results.
+ * together = ONE), Status, Source, Work arrangement, Favorites. Search is always visible
+ * and the Date applied sort is not a filter, so neither counts. "All" is inactive. It reads
+ * the range the list actually uses, so it always agrees with the results.
  */
 function activeFilterCount() {
   const range = readDateRange();
   return (range.from || range.to ? 1 : 0) +
     (els.filterStatus.value ? 1 : 0) +
     (els.filterSource.value ? 1 : 0) +
-    (els.filterWorkArrangement.value ? 1 : 0);
+    (els.filterWorkArrangement.value ? 1 : 0) +
+    (els.filterFavorites.value ? 1 : 0);
 }
 
 function syncFiltersCount() {
@@ -586,11 +658,18 @@ function toggleDateSort() {
   renderList();
 }
 
+/** "" (All applications) / "favorites" (Favorites only) / "not-favorites" (Not favorites). */
+function matchesFavoritesFilter(app, filterValue) {
+  if (!filterValue) return true;
+  return filterValue === "favorites" ? !!app.favorite : !app.favorite;
+}
+
 function getFilteredAndSortedApplications() {
   const query = els.searchInput.value.trim().toLowerCase();
   const statusFilter = els.filterStatus.value;
   const sourceFilter = els.filterSource.value;
   const workFilter = els.filterWorkArrangement.value;
+  const favoritesFilter = els.filterFavorites.value;
   const dateRange = readDateRange();
 
   let result = applications.filter((app) => {
@@ -600,7 +679,8 @@ function getFilteredAndSortedApplications() {
       (app.company || "").toLowerCase().includes(query);
     const matchesStatus = !statusFilter || app.status === statusFilter;
     const matchesSource = !sourceFilter || app.source === sourceFilter;
-    return matchesQuery && matchesStatus && matchesSource && matchesWorkArrangement(app, workFilter) && dateInRange(app, dateRange);
+    const matchesFavorites = matchesFavoritesFilter(app, favoritesFilter);
+    return matchesQuery && matchesStatus && matchesSource && matchesFavorites && matchesWorkArrangement(app, workFilter) && dateInRange(app, dateRange);
   });
 
   // Original array position, used only as the very last tie-breaker.
@@ -749,7 +829,7 @@ function renderTableRows(list) {
     // uses the same shared formatSalaryDisplay() as the Details panel, which
     // already treats a blank or whitespace-only amount as empty.
     tr.innerHTML = `
-      <td class="cell-muted">${escapeHtml(app.appNumber || "—")}</td>
+      <td class="cell-muted"><span class="fav-id">${favoriteButtonHtml(app)}${escapeHtml(app.appNumber || "—")}</span></td>
       <td class="cell-ai-summary">${overallMatchHtml(app)}</td>
       <td class="cell-title">${escapeHtml(app.jobTitle)}</td>
       <td>${escapeHtml(app.company)}</td>
@@ -782,7 +862,7 @@ function renderCardItems(list) {
     // is presentation only — dateApplied / dateAppliedTimestamp are not touched.
     card.innerHTML = `
       <div class="app-card__top">
-        <span class="app-card__id">${escapeHtml(app.appNumber || "—")}</span>
+        <span class="app-card__id fav-id">${favoriteButtonHtml(app)}${escapeHtml(app.appNumber || "—")}</span>
         ${statusPillHtml(app.status)}
       </div>
       <div class="app-card__main">
@@ -837,6 +917,23 @@ function makeRowActionButton(icon, accessibleLabel, onClick, isDanger) {
 function statusPillHtml(status) {
   const meta = STATUS_META[status] || { pill: "toapply" };
   return `<span class="status-pill status-pill--${meta.pill}">${escapeHtml(status)}</span>`;
+}
+
+/**
+ * Heart toggle for one application — reused in the table, cards, and the
+ * Details panel. A real <button> (keyboard-operable: Enter/Space fire the
+ * same click the delegated listener below handles), outlined by default,
+ * filled red once favorited (CSS: .favorite-btn.is-favorite).
+ */
+function favoriteButtonHtml(app) {
+  const isFavorite = !!app.favorite;
+  const label = isFavorite ? "Remove from favorites" : "Add to favorites";
+  return (
+    `<button type="button" class="favorite-btn${isFavorite ? " is-favorite" : ""}" data-favorite-toggle data-app-id="${escapeHtml(app.id)}" ` +
+    `aria-pressed="${isFavorite}" aria-label="${label}" title="${label}">` +
+    `<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 1 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>` +
+    `</button>`
+  );
 }
 
 /* ---------------------------------------------------------
@@ -1122,6 +1219,15 @@ function handleFormSubmit(event) {
       const merged = { ...a, ...data, updatedAt: now };
       if (dateAppliedTimestamp) merged.dateAppliedTimestamp = dateAppliedTimestamp;
       else delete merged.dateAppliedTimestamp;
+      // Auto-Ghosted countdown: a MANUAL transition into Applied — from
+      // Ghosted (the override case) or from any other status — (re)starts
+      // the 14-day countdown from today, the date of this change, not from
+      // the Application Date and not from whatever appliedSince held
+      // before. Staying Applied (editing other fields) or moving to any
+      // other status leaves appliedSince exactly as it was.
+      if (data.status === "Applied" && a.status !== "Applied") {
+        merged.appliedSince = toLocalDateString(new Date());
+      }
       return merged;
     });
   } else {
@@ -1132,6 +1238,11 @@ function handleFormSubmit(event) {
         appNumber: formatAppNumber(newAppNumber),
         ...data,
         ...(dateAppliedTimestamp ? { dateAppliedTimestamp } : {}),
+        // Auto-Ghosted countdown: a brand-new application created directly
+        // as Applied starts its 14-day countdown from its own Application
+        // Date (unlike a later manual transition into Applied, which starts
+        // from today instead — see the edit branch above).
+        ...(data.status === "Applied" ? { appliedSince: data.dateApplied } : {}),
         createdAt: now,
         updatedAt: now,
       },
@@ -1171,7 +1282,7 @@ function openDetails(id, options) {
 
   els.detailsBody.innerHTML = `
     <div class="detail-grid">
-      ${detailField("Application ID", app.appNumber || "—")}
+      ${detailField("Application ID", `<span class="fav-id">${favoriteButtonHtml(app)}${escapeHtml(app.appNumber || "—")}</span>`, true)}
       ${detailField("Job title", app.jobTitle)}
       ${detailField("Company", app.company)}
       ${detailField("Source", formatSourceDisplay(app.source, app.sourceOther))}
@@ -1658,6 +1769,59 @@ function attachMatchPopoverListeners() {
   window.addEventListener("resize", hidePopover);
 }
 
+/**
+ * Delegated so every heart button — across the table, cards, and the
+ * Details panel, all re-created on every render — is covered by one
+ * listener. There's no row/card click-to-open behavior to protect against
+ * (View/Edit/Delete are the only things that open anything), so toggling
+ * never needs to stop a click from doing something else.
+ */
+function attachFavoriteToggleListeners() {
+  document.addEventListener("click", (event) => {
+    const btn = event.target.closest ? event.target.closest("[data-favorite-toggle]") : null;
+    if (!btn) return;
+    toggleFavorite(btn.dataset.appId);
+  });
+}
+
+/**
+ * Flips one application's favorite flag and persists it, then updates
+ * every heart currently on screen for it and re-renders the list — so a
+ * Favorites-only filter drops an application the instant it's unfavorited,
+ * and the table/card heart and the Details panel's heart (if open) never
+ * disagree.
+ */
+function toggleFavorite(id) {
+  const app = applications.find((a) => a.id === id);
+  if (!app) return;
+  const nextFavorite = !app.favorite;
+  const updated = applications.map((a) => (a.id === id ? { ...a, favorite: nextFavorite } : a));
+  const saved = saveApplications(updated);
+  if (!saved) {
+    showToast("Couldn't save — your browser's storage may be full or unavailable.");
+    return;
+  }
+  applications = updated;
+  syncFavoriteButtons(id, nextFavorite);
+  renderList();
+}
+
+/**
+ * Updates every currently-rendered heart button for one application in
+ * place (table row, card, and the Details panel if it's open). renderList()
+ * (called right after this) rebuilds the table/cards anyway — this is for
+ * the one surface that doesn't: the Details panel.
+ */
+function syncFavoriteButtons(id, isFavorite) {
+  const label = isFavorite ? "Remove from favorites" : "Add to favorites";
+  document.querySelectorAll('[data-favorite-toggle][data-app-id="' + id + '"]').forEach((btn) => {
+    btn.classList.toggle("is-favorite", isFavorite);
+    btn.setAttribute("aria-pressed", String(isFavorite));
+    btn.setAttribute("aria-label", label);
+    btn.title = label;
+  });
+}
+
 function attachEventListeners() {
   // Open add form
   els.addBtn.addEventListener("click", () => openForm(null));
@@ -1740,6 +1904,7 @@ function attachEventListeners() {
   els.filterStatus.addEventListener("change", renderList);
   els.filterSource.addEventListener("change", renderList);
   els.filterWorkArrangement.addEventListener("change", renderList);
+  els.filterFavorites.addEventListener("change", renderList);
   // "input" gives a live update while a date is picked/typed; "change" covers browsers that only fire that.
   [els.filterDateFrom, els.filterDateTo].forEach((input) => {
     input.addEventListener("input", onDateFilterChange);
@@ -1755,6 +1920,7 @@ function attachEventListeners() {
     els.filterStatus.value = "";
     els.filterSource.value = "";
     els.filterWorkArrangement.value = "";
+    els.filterFavorites.value = "";
     els.filterDateFrom.value = "";
     els.filterDateTo.value = "";
     lastValidDateRange = { from: "", to: "" };
@@ -1795,6 +1961,7 @@ function attachEventListeners() {
   });
 
   attachMatchPopoverListeners();
+  attachFavoriteToggleListeners();
 }
 
 /* ---------------------------------------------------------

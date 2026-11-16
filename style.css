@@ -1229,6 +1229,37 @@ button { font-family: inherit; cursor: pointer; }
 .row-action:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 .ledger td.cell-actions .row-action + .row-action { margin-left: 6px; }
 
+/* Favorite heart: outlined/muted by default, filled red once favorited.
+   Shared by the table, the cards, and the Details panel — .fav-id just
+   aligns the heart with the Application ID text wherever it appears. */
+.fav-id { display: inline-flex; align-items: center; gap: 6px; }
+.favorite-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink-faint);
+  cursor: pointer;
+}
+.favorite-btn svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.favorite-btn:hover { color: var(--danger-strong); }
+.favorite-btn:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; border-radius: var(--radius-sm); }
+.favorite-btn.is-favorite { color: var(--danger-strong); }
+.favorite-btn.is-favorite svg { fill: currentColor; }
+
 /* =========================================================
    Status pill
    ========================================================= */

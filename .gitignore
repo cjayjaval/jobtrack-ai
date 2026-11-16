@@ -17,3 +17,4 @@ server/dev/*.local.js
 # Reference
 references/
 CLAUDE.md
+jobtrack_context.md

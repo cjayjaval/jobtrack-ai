@@ -4,9 +4,13 @@ JobTrack AI is a lightweight job application tracker with AI-assisted resume-to-
 
 It started as a local job application tracker and has evolved into a portfolio project combining practical QA workflows, frontend development, backend API integration, deterministic scoring, and AI-assisted job requirement analysis.
 
+## Live Demo
+
+**[https://cjayjaval.github.io/jobtrack-ai/](https://cjayjaval.github.io/jobtrack-ai/)**
+
 ## Current Version
 
-**v0.4.0 — Dashboard Redesign & Theme System**
+**v0.4.3 — Application Favorites & Auto-Ghosted**
 
 ## Features
 
@@ -20,7 +24,7 @@ It includes:
 - Quick access to application management
 - Search, filtering, and sorting
 - Responsive dashboard layout
-- Light and dark appearance modes
+- Light Glass and Dark Glass appearance modes
 - Persistent theme preference
 - Updated visual design and navigation
 
@@ -37,17 +41,37 @@ It includes:
 - Local browser persistence using `localStorage`
 - JSON data export
 
+### Favorites
+
+- Mark any application as a favorite from a heart icon in the table, the mobile cards, or Application Details — all three stay in sync
+- Filter the list by All applications, Favorites only, or Not favorites, alongside every other filter
+- Favorite state is saved in `localStorage` and survives edits, filtering, and page refreshes
+
+### Responsive Layout & Navigation
+
+Desktop scrolling behavior was refined so page headers and key controls stay in view while content scrolls independently.
+
+- Desktop Applications table keeps the page header, toolbar, and a sticky column header in view while only the table content scrolls
+- Desktop Dashboard keeps the greeting and key actions in view while dashboard content scrolls independently
+- A floating "Back to Top" control appears on mobile after scrolling down
+- Layout and navigation adapt across desktop, tablet, and mobile screen widths
+
 ### Application Status Tracking
 
 Supported statuses include:
 
+- To Apply
 - Applied
 - For Initial Interview
 - For Technical Interview
 - For Final Interview
 - Offered
-- Failed
 - Ghosted
+- Rejected
+- Withdrawn
+- Failed
+
+An application left at **Applied** for 14 calendar days automatically moves to **Ghosted** — no action needed. Manually changing it back to Applied restarts that 14-day countdown from the date of the change, so it won't immediately flip back.
 
 ### Job Requirements
 
@@ -60,6 +84,14 @@ Applications can contain:
 - Custom Nice-to-Have Skills
 
 Matching predefined skills cannot be selected as both Required and Nice-to-Have at the same time.
+
+### How to Use Tutorial
+
+JobTrack AI includes an in-app "How to Use" guide.
+
+- Narrated walkthrough video demonstrating the core workflow
+- Optional English captions, available through the video player's native controls
+- Written step-by-step instructions alongside the video
 
 ## AI Job Match
 
@@ -150,8 +182,8 @@ The progress percentage is an estimated visual indicator and does not represent 
 
 JobTrack AI includes a dedicated appearance system supporting:
 
-- Light mode
-- Dark mode
+- Light Glass theme
+- Dark Glass theme
 - Persistent theme preference
 - Theme-specific visual assets
 - Consistent styling across the application shell and dashboard
@@ -215,6 +247,8 @@ JobTrack-AI/
 ├── assets/
 │   ├── bg-dark.png
 │   ├── bg-light.png
+│   ├── how-to-use.mp4
+│   ├── how-to-use.vtt
 │   ├── logo-mark.png
 │   └── logo.png
 ├── js/
@@ -247,6 +281,17 @@ JobTrack-AI/
         ├── scoring.js
         └── scoring.test.js
 ```
+
+## Known Limitations
+
+The following features are planned but not yet implemented:
+
+- **Analytics** — charts and trends for application history are not yet available; the Dashboard currently shows summary metrics only
+- **Resume Library** — JobTrack AI currently supports a single resume used across all applications; multi-resume support is planned
+
+Both are visible in the navigation as upcoming features.
+
+The automatic Ghosted status check runs when the app loads and whenever an application is added, edited, or deleted — not merely when switching between Dashboard and Applications. An application can sit past its 14-day mark, still showing Applied, until the next one of those events.
 
 ## Project Status
 
